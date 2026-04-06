@@ -2,12 +2,13 @@ const userModel = require("../model/user.model");
 const bcrypt = require("bcrypt");
 const { generateToken } = require("../utils/token");
 const crypto = require("crypto");
-const transporter = require("../utils/emailSender");
+const { sendMail: sendEmail, isEmailConfigured } = require("../utils/emailSender");
 const multer = require("multer");
 const DatauriParser = require("datauri/parser");
 const path = require("path");
-const cloudinary = require("../utils/cloudinary");
+const { cloudinary, isCloudinaryConfigured } = require("../utils/cloudinary");
 const mongoose = require("mongoose");
+const { saveLocalFiles } = require("../utils/localUploads");
 require('dotenv').config();
 
 const parser = new DatauriParser();
@@ -23,6 +24,13 @@ const uploadImages = async (files) => {
   const uploads = files.map(async (file) => {
     const ext = path.extname(file.originalname).toString();
     const file64 = parser.format(ext, file.buffer);
+
+    if (!isCloudinaryConfigured) {
+      const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+      const [localUrl] = await saveLocalFiles([file], "avatars", baseUrl);
+      return localUrl;
+    }
+
     const result = await cloudinary.uploader.upload(file64.content, {
       folder: "rentEase/userAvatar",
     });
@@ -44,10 +52,6 @@ const createUser = async (req, res) => {
       });
     }
 
-    const otp = crypto.randomInt(100000, 999999).toString();
-
-    const otpExpires = Date.now() + 10 * 60 * 1000;
-
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await userModel.create({
@@ -56,10 +60,7 @@ const createUser = async (req, res) => {
       email,
       password: hashedPassword,
       profileImage: `https://avatar.iran.liara.run/username?username=${fullname}`,
-
-      otp,
-      otpExpires,
-      isVerified: false,
+      isVerified: true,
     });
 
     const token = generateToken({
@@ -70,24 +71,17 @@ const createUser = async (req, res) => {
       currentRole: newUser.currentRole,
     });
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: newUser.email,
-      subject: "Verify your RentEase Account",
-      html: `<h2>Your OTP: ${otp}</h2>`,
-    });
-
     return res.status(201).json({
       success: true,
-      message:
-        "User created successfully. Please verify your email with the OTP.",
+      message: "User created successfully. Please sign in.",
       user: {
         id: newUser._id,
         fullname: newUser.fullname,
         phoneNumber: newUser.phoneNumber,
         profileImage: newUser.profileImage,
         email: newUser.email,
-        role: newUser.roles,
+        roles: newUser.roles,
+        currentRole: newUser.currentRole,
       },
       token,
     });
@@ -173,9 +167,9 @@ const unsaveProperty = async (req, res) => {
     const user = await userModel.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const propId = new mongoose.Types.ObjectId(propertyId);
-
-    const index = user.savedProperties.indexOf(propId);
+    const index = user.savedProperties.findIndex(
+      (id) => id.toString() === propertyId
+    );
     if (index === -1) {
       return res.status(400).json({ message: "Property not in saved list" });
     }
@@ -222,7 +216,7 @@ const getUserById = async (req, res) => {
     const user = await userModel
       .findById(req.params.id)
       .select("-password")
-      .populate("savedProperties", "title price imgUls");
+      .populate("savedProperties", "title price imgUrls");
 
     if (!user) {
       return res.status(404).json({
@@ -246,10 +240,24 @@ const getUserById = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const updates = req.body;
+    const updates = { ...req.body };
 
-    if (updates.password)
+    // Handle password change with verification
+    if (updates.currentPassword && updates.newPassword) {
+      const existingUser = await userModel.findById(req.params.id);
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const isMatch = await bcrypt.compare(updates.currentPassword, existingUser.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+      updates.password = await bcrypt.hash(updates.newPassword, 10);
+      delete updates.currentPassword;
+      delete updates.newPassword;
+    } else if (updates.password) {
       updates.password = await bcrypt.hash(updates.password, 10);
+    }
 
     const file = req.file; 
     if (file) {
@@ -338,7 +346,7 @@ const sendEnquiry = async (req, res) => {
   const { fullname, email, phone, message, ownerEmail } = req.body;
 
   try {
-    await transporter.sendMail({
+    await sendEmail({
       from: process.env.EMAIL_USER,
       to: ownerEmail,
       subject: "New Property Enquiry - RentEase",
@@ -387,8 +395,10 @@ const sendMail = async (req, res) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    res.status(200).json({ message: 'Email sent successfully.' });
+    await sendEmail(mailOptions);
+    res.status(200).json({ 
+      message: isEmailConfigured ? 'Email sent successfully.' : 'Email service is not configured yet. Message was not sent.',
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Failed to send email.' });

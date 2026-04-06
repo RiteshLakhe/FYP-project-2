@@ -41,7 +41,7 @@ const EditProperty = () => {
       } catch (error) {
         console.error("Failed to fetch property:", error);
         alert("Failed to load property data");
-        navigate("/landlord/dashboard");
+        navigate("/landlord/landlord-dashboard");
       }
     };
 

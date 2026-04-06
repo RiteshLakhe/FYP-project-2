@@ -22,7 +22,7 @@ import { useEffect, useState } from "react";
 import { Axios } from "@/services/AxiosInstance";
 import { API_ENDPOINTS } from "@/services/Endpoints";
 import Cookies from "js-cookie";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const items = [
   {
@@ -37,7 +37,7 @@ const items = [
   },
   {
     title: "Properties",
-    url: "/admin/AllProperties",
+    url: "/admin/allProperties",
     icon: Calendar,
   },
 ];
@@ -67,7 +67,7 @@ export function AppSidebar() {
 
   const handleSignOut = async () => {
     Cookies.remove("userId");
-    Cookies.remove("token");
+    Cookies.remove("authToken");
     
     navigate("/");
   }
@@ -85,10 +85,10 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url}>
+                    <Link to={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

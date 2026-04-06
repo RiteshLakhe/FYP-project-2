@@ -5,7 +5,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { generateToken } = require("../utils/token");
 require("dotenv").config();
-const transporter = require('../utils/emailSender');
+const { sendMail, isEmailConfigured } = require("../utils/emailSender");
 
 const logIn = async (req, res) => {
   try {
@@ -36,7 +36,7 @@ const logIn = async (req, res) => {
         res.cookie("token", token, {
           httpOnly: true,
           maxAge: 7 * 24 * 60 * 60 * 1000,
-          secure: "production",
+          secure: process.env.NODE_ENV === "production",
         });
       }
 
@@ -47,8 +47,11 @@ const logIn = async (req, res) => {
         user: {
           id: admin._id,
           fullname: admin.fullname,
+          phoneNumber: null,
+          profileImage: "",
           email: admin.email,
           roles: "admin",
+          currentRole: "admin",
         },
       });
     }
@@ -80,7 +83,7 @@ const logIn = async (req, res) => {
       res.cookie("token", token, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
-        secure: "production",
+        secure: process.env.NODE_ENV === "production",
       });
     }
 
@@ -94,7 +97,7 @@ const logIn = async (req, res) => {
         phoneNumber: user.phoneNumber,
         profileImage: user.profileImage,
         email: user.email,
-        role: user.currentRole,
+        currentRole: user.currentRole,
         roles: user.roles,
       },
     });
@@ -124,7 +127,7 @@ const forgotPassword = async (req, res) => {
 
     const resetLink = `${process.env.CLIENT_URL}/registration/reset-password/${token}`;
 
-    await transporter.sendMail({
+    await sendMail({
       from: `"RentEase Support" <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: 'Password Reset - RentEase',
@@ -137,7 +140,13 @@ const forgotPassword = async (req, res) => {
       `,
     });
 
-    res.json({ message: 'Password reset link sent to your email.' });
+    res.json({
+      message: isEmailConfigured
+        ? 'Password reset link sent to your email.'
+        : 'Email is not configured. Returning reset details for development.',
+      devResetToken: isEmailConfigured ? undefined : token,
+      devResetLink: isEmailConfigured ? undefined : resetLink,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

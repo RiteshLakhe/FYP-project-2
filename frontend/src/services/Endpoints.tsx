@@ -35,7 +35,7 @@ export const API_ENDPOINTS: {
   PROPERTY: PropertyEndpoints;
 } = {
   AUTH: {
-    LOGIN: "auth/login",
+    LOGIN: "/auth/login",
     REGISTER: "/user/registerUser",
     LOGOUT: "/auth/logout",
     OTP: "/user/verify-otp",
@@ -47,7 +47,7 @@ export const API_ENDPOINTS: {
     PROFILE: "/user/profile",
     SWITCH_ROLE: "/user/switch-role",
     GET_USER_BY_ID: (id) => `/user/getUserById/${id}`,
-    UPDATE_USER: (id) => `user/updateUser/${id}`,
+    UPDATE_USER: (id) => `/user/updateUser/${id}`,
     SAVE_PROPERTY: "/user/save-properties",
     UNSAVE_PROPERTY: (propertyId) => `/user/unsave-property/${propertyId}`,
     GET_SAVED_PROPERTY: "/user/get-saved-properties",

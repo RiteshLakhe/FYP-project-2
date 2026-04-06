@@ -35,10 +35,9 @@ Axios.interceptors.response.use(
       // window.location.href = "/registration/signin";
     }
     
-    if (error.response?.status === 403) {
-      alert("Please verify your email first!");
-      // window.location.href = "/registration/otp-verification";
-    }
+    // if (error.response?.status === 403) {
+    //   alert("Please verify your email first!");
+    // }
 
     return Promise.reject(error);
   }

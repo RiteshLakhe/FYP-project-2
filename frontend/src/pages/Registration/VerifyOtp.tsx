@@ -13,6 +13,8 @@ import Cookies from "js-cookie";
 import { useUser } from "@/context/UserContext";
 import { useEffect } from "react";
 
+const isSecureContext = window.location.protocol === "https:";
+
 interface VerifyOtpFormData {
   email: string;
   otp: string;
@@ -66,7 +68,7 @@ const VerifyOtp: React.FC = () => {
       }
 
       const cookieOptions = {
-        secure: true,
+        secure: isSecureContext,
         sameSite: "Lax" as const,
       };
       Cookies.set("authToken", token, cookieOptions);

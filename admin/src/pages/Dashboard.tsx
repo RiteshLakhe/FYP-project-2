@@ -132,7 +132,7 @@ export const Dashboard = () => {
                     </Link>
                   </TableCell>
                   <TableCell>{property.category}</TableCell>
-                  <TableCell>{property.area}</TableCell>
+                  <TableCell>{property.address}</TableCell>
                   <TableCell>{owner ? owner.fullname : "Unknown"}</TableCell>
                 </TableRow>
               );

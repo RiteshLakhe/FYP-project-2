@@ -180,7 +180,6 @@ export default function LandlordDashboard() {
                       <TableRow key={property._id} className="cursor-pointer">
                         <TableCell>{property.title}</TableCell>
                         <TableCell>
-                          <TableCell>
                             <PropertyStatusDropdown
                               propertyId={property._id}
                               currentStatus={property.status}
@@ -194,7 +193,6 @@ export default function LandlordDashboard() {
                                 );
                               }}
                             />
-                          </TableCell>
                         </TableCell>
                         <TableCell>{property.category}</TableCell>
                         <TableCell>Rs. {property.price}</TableCell>
@@ -231,7 +229,7 @@ export default function LandlordDashboard() {
   );
 
   function viewProperty(id: string) {
-    window.location.href = `/landlord/property/${id}`;
+    window.location.href = `/property/${id}`;
   }
 
   function editProperty(id: string) {

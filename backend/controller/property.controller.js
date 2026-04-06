@@ -1,10 +1,11 @@
 const propertyModel = require("../model/property.model");
-const cloudinary = require("../utils/cloudinary");
+const { cloudinary, isCloudinaryConfigured } = require("../utils/cloudinary");
 const DatauriParser = require("datauri/parser");
 const path = require("path");
 const multer = require("multer");
 const userModel = require("../model/user.model");
 const mongoose = require("mongoose");
+const { saveLocalFiles } = require("../utils/localUploads");
 
 const parser = new DatauriParser();
 
@@ -17,6 +18,13 @@ const uploadImages = async (files) => {
   const uploads = files.map(async (file) => {
     const ext = path.extname(file.originalname).toString();
     const file64 = parser.format(ext, file.buffer);
+
+    if (!isCloudinaryConfigured) {
+      const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+      const [localUrl] = await saveLocalFiles([file], "properties", baseUrl);
+      return localUrl;
+    }
+
     const result = await cloudinary.uploader.upload(file64.content, {
       folder: "rentEase/Properties",
     });
@@ -54,6 +62,12 @@ const createProperty = async (req, res) => {
     await newProperty.save();
 
     const user = await userModel.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found for this property",
+      });
+    }
 
     if (!user.roles.includes("landlord")) {
       user.roles.push("landlord");
@@ -76,9 +90,13 @@ const createProperty = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
+    const isValidationError = error?.name === "ValidationError";
+    res.status(isValidationError ? 400 : 500).json({
       success: false,
-      message: "Failed to create property",
+      message: error.message || "Failed to create property",
+      errors: isValidationError ? Object.fromEntries(
+        Object.entries(error.errors).map(([key, value]) => [key, value.message])
+      ) : undefined,
     });
   }
 };

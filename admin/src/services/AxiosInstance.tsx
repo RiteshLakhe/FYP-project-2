@@ -38,8 +38,7 @@ Axios.interceptors.response.use(
     }
     
     if (error.response?.status === 403) {
-      alert("Please verify your email first!");
-      // window.location.href = "/registration/otp-verification";
+      console.error("Access forbidden.");
     }
 
     return Promise.reject(error);

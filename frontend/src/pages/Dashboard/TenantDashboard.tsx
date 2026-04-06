@@ -62,13 +62,13 @@ export default function TenantDashboard() {
             {user?.isVerified === true ? (
               <div>
                 <p className="text-xs text-gray-400">
-                  Your aaccount is verified
+                  Your account is verified
                 </p>
               </div>
             ) : (
               <div>
                 <p className="text-xs text-gray-400">
-                  You account is not verified <a href="">Get verified</a>
+                  Your account is not verified <a href="/registration/otp-verification" className="text-blue-500 hover:underline">Get verified</a>
                 </p>
               </div>
             )}

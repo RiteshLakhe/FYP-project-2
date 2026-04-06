@@ -99,7 +99,7 @@ const Navbar = () => {
   };
 
   const handleProfile = () => {
-    navigate("/profile");
+    navigate("/dashboard");
     setIsOpen(false);
   };
 

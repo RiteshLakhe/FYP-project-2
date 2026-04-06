@@ -69,14 +69,12 @@ const Signup = () => {
 
       const { message } = response.data;
 
-      toast.success(message || "Registration successful! Please verify OTP.", {
+      toast.success(message || "Registration successful! Please sign in.", {
         position: "top-right",
         autoClose: 3000,
       });
 
-      navigate(
-        `/registration/otp-verification?email=${encodeURIComponent(data.email)}`
-      );
+      navigate("/registration/signin");
     } catch (error) {
       const err = error as AxiosError<{ message: string }>;
       toast.error(

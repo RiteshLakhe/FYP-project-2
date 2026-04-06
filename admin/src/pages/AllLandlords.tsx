@@ -56,7 +56,7 @@ export const AllLandlords = () => {
                 <TableCell>{index + 1}</TableCell>
                 <TableCell>{user.fullname}</TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.phone || "N/A"}</TableCell>
+                <TableCell>{user.phoneNumber || "N/A"}</TableCell>
                 <TableCell>{count}</TableCell>
               </TableRow>
             );

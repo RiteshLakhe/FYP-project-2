@@ -27,7 +27,7 @@ export const API_ENDPOINTS: {
     GET_ADMIN: "/admin/getAdmin",
   },
   AUTH: {
-    LOGIN: "auth/login",
+    LOGIN: "/auth/login",
   },
   USER: {
     GET_ALL_USERS: `/user/getAllUsers`,

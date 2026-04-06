@@ -11,7 +11,7 @@ const registerAdmin = async (req, res) => {
     const existingAdmin = await adminModel.findOne({ email });
     if (existingAdmin) {
       return res.status(400).json({
-        sucess: false,
+        success: false,
         message: "Admin already exists",
       });
     }
@@ -22,19 +22,18 @@ const registerAdmin = async (req, res) => {
       fullname,
       email,
       password: hashedPassword,
-      role: "admin"
     });
 
     await admin.save();
 
     res.status(200).json({
-      sucess: true,
+      success: true,
       message: "Admin created successfully",
       admin,
     });
   } catch (error) {
     res.status(500).json({
-      sucess: false,
+      success: false,
       message: error.message,
     });
   }
@@ -45,18 +44,18 @@ const getAdmin = async (req, res) => {
     const admin = await adminModel.findOne({ roles: "admin" });
     if (!admin) {
       return res.status(404).json({
-        sucess: false,
+        success: false,
         message: "Admin not found",
       });
     }
 
     res.status(200).json({
-      sucess: true,
+      success: true,
       message: admin,
     });
   } catch (error) {
     res.status(500).json({
-      sucess: false,
+      success: false,
       message: error.message,
     });
   }

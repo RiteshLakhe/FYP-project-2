@@ -48,7 +48,7 @@ export const AllProperties = () => {
                 <TableCell>{index + 1}</TableCell>
                 <TableCell>{p.title}</TableCell>
                 <TableCell>{p.category}</TableCell>
-                <TableCell>{p.area}</TableCell>
+                <TableCell>{p.address}</TableCell>
                 <TableCell>${p.price}</TableCell>
                 <TableCell>{owner?.fullname || "Unknown"}</TableCell>
               </TableRow>

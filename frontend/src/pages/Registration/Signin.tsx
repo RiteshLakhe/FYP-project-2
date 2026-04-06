@@ -11,6 +11,8 @@ import { toast } from "react-toastify";
 import Cookies from "js-cookie";
 import { Eye, EyeOff } from "lucide-react";
 
+const isSecureContext = window.location.protocol === "https:";
+
 interface LoginFormData {
   email: string;
   password: string;
@@ -61,7 +63,7 @@ const Signin = () => {
 
         const cookieOptions = {
           expires: data.rememberMe ? 7 : undefined,
-          secure: true,
+          secure: isSecureContext,
           sameSite: "Lax" as const,
         };
         Cookies.set("authToken", token, cookieOptions);

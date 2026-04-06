@@ -3,6 +3,8 @@ import Cookies from "js-cookie";
 import { Axios } from "@/services/AxiosInstance";
 import { API_ENDPOINTS } from "@/services/Endpoints";
 
+const isSecureContext = window.location.protocol === "https:";
+
 interface User {
   id: string;
   fullname: string;
@@ -54,7 +56,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
     const cookieOptions = {
       expires: rememberMe ? 7 : undefined,
-      secure: true,
+      secure: isSecureContext,
       sameSite: "Lax" as const,
     };
 

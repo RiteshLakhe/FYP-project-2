@@ -28,13 +28,8 @@ const adminModel = mongoose.Schema(
 );
 
 adminModel.statics.adminExists = async function () {
-  const adminCount = await this.countDocuments({ role: "admin" });
-  if (adminCount >= 1) {
-    return res.status(400).json({
-      success: false,
-      message: "Only one admin account is allowed",
-    });
-  }
+  const adminCount = await this.countDocuments({ roles: "admin" });
+  return adminCount >= 1;
 };
 
 module.exports = mongoose.model("Admin", adminModel);

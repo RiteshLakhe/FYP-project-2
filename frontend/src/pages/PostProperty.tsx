@@ -14,7 +14,7 @@ const PostProperty = () => {
           Got a room, flat, or commercial space sitting idle? Put it to work —
           list your property today and start earning.
         </p>
-        <button className="font-medium border px-8 py-4 bg-[#1E293B] text-white rounded-sm" onClick={() => navigate("/addPropertyForm")}>List your Property</button>
+        <button className="font-medium border px-8 py-4 bg-[#1E293B] text-white rounded-sm" onClick={() => navigate("/landlord/addPropertyForm")}>List your Property</button>
       </div>
     </div>
   );

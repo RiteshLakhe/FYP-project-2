@@ -4,7 +4,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Axios } from "@/services/AxiosInstance";
 import { API_ENDPOINTS } from "@/services/Endpoints";
-import zxcvbn from "zxcvbn";
 import { Eye, EyeOff } from "lucide-react";
 
 const ResetPassword = () => {

@@ -39,6 +39,7 @@ const PROPERTY_CATEGORIES = [
 
 const Home = () => {
   const [properties, setProperties] = useState<Property[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchProperties = async () => {
     try {
@@ -46,6 +47,8 @@ const Home = () => {
       setProperties(response.data.properties);
     } catch (error) {
       console.error("Failed to fetch property:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -91,9 +94,15 @@ const Home = () => {
               <h1 className="text-2xl text-center">{category.title}</h1>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 {properties.length === 0 ? (
+                  isLoading ? (
                   <p className="col-span-full text-center">
                     Loading properties...
                   </p>
+                  ) : (
+                  <p className="col-span-full text-center">
+                    No properties found yet.
+                  </p>
+                  )
                 ) : filteredProperties.length === 0 ? (
                   <p className="col-span-full text-center">
                     No properties found in this category.

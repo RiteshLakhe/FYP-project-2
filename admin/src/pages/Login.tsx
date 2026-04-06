@@ -29,7 +29,7 @@ export const Login = () => {
   
       if (success && user.roles === "admin") {
 
-        Cookies.set("token", token, { expires: 7 });
+        Cookies.set("authToken", token, { expires: 7 });
         Cookies.set("userId", user.id);
         
         navigate("/admin/dashboard");
