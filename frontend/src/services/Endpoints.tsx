@@ -27,6 +27,9 @@ interface PropertyEndpoints {
   GET_ALL: string;
   GET_BY_ID: (id: string) => string;
   GET_BY_OWNER: (userId: string) => string;
+  ADD_REVIEW: (id: string) => string;
+  SCHEDULE_VISIT: (id: string) => string;
+  UPDATE_VISIT_STATUS: (id: string, visitId: string) => string;
   UPDATE: (id: string) => string;
   DELETE: (id: string) => string;
   UPDATE_STATUS: (id: string) => string,
@@ -66,6 +69,9 @@ export const API_ENDPOINTS: {
     GET_ALL: "/property/getAllProperty",
     GET_BY_ID: (id) => `/property/propertyById/${id}`,
     GET_BY_OWNER: (userId) => `/property/owner/${userId}`,
+    ADD_REVIEW: (id) => `/property/${id}/reviews`,
+    SCHEDULE_VISIT: (id) => `/property/${id}/visits`,
+    UPDATE_VISIT_STATUS: (id, visitId) => `/property/${id}/visits/${visitId}`,
     UPDATE: (id) => `/property/updateProperty/${id}`,
     DELETE: (id) => `/property/deleteProperty/${id}`,
     UPDATE_STATUS: (id) => `/property/updateStatus/${id}`, 

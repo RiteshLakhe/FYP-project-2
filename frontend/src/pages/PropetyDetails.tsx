@@ -5,7 +5,7 @@ import { API_ENDPOINTS } from "@/services/Endpoints";
 import { FaBath, FaRegBookmark, FaBookmark } from "react-icons/fa";
 import { IoBed } from "react-icons/io5";
 import { TbToolsKitchen2 } from "react-icons/tb";
-import { FaLocationDot, FaHouseChimney, FaCouch } from "react-icons/fa6";
+import { FaLocationDot, FaHouseChimney, FaCouch, FaStar } from "react-icons/fa6";
 import { IoMdMail } from "react-icons/io";
 import { FaPhoneAlt } from "react-icons/fa";
 import { MdBalcony } from "react-icons/md";
@@ -13,8 +13,10 @@ import Searchbar from "@/components/Searchbar";
 import PropertyCard from "@/components/PropertyCard";
 import { toast } from "react-toastify";
 import Cookies from "js-cookie";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface User {
+  id?: string;
   _id: string;
   fullname: string;
   email: string;
@@ -27,6 +29,48 @@ interface PropertyLocation {
   longitude: number;
   mapLabel: string;
   googleMapsUrl: string;
+}
+
+interface PropertyReview {
+  _id: string;
+  userId?: User;
+  fullname: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+interface VisitSchedule {
+  _id: string;
+  visitorId?: User;
+  visitorName: string;
+  visitorEmail: string;
+  visitorPhone: string;
+  scheduledFor: string;
+  note: string;
+  status: "Pending" | "Approved" | "Rejected" | "Completed";
+  responseMinutes?: number | null;
+  createdAt: string;
+}
+
+interface PriceHistoryEntry {
+  price: number;
+  changedAt: string;
+  reason: string;
+}
+
+interface TrustScore {
+  score: number;
+  label: "Low" | "Moderate" | "High" | "Excellent";
+  breakdown: {
+    verifiedIdentity: number;
+    positiveReviews: number;
+    responseTime: number;
+    listingAccuracy: number;
+    complaintHistory: number;
+  };
+  responseRate: number;
+  averageRating: number;
 }
 
 interface Property {
@@ -60,6 +104,10 @@ interface Property {
   description?: string;
   userId?: string | User;
   location?: PropertyLocation;
+  reviews: PropertyReview[];
+  visitSchedules: VisitSchedule[];
+  priceHistory: PriceHistoryEntry[];
+  trustScore: TrustScore;
   createdAt: string;
 }
 
@@ -68,6 +116,17 @@ interface EnquiryForm {
   email: string;
   phone: string;
   message: string;
+}
+
+interface ReviewForm {
+  rating: number;
+  comment: string;
+}
+
+interface VisitForm {
+  scheduledFor: string;
+  visitorPhone: string;
+  note: string;
 }
 
 const PropertyDetails = () => {
@@ -82,11 +141,23 @@ const PropertyDetails = () => {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [isSchedulingVisit, setIsSchedulingVisit] = useState(false);
+  const [mapMode, setMapMode] = useState<"map" | "satellite" | "nearby">("map");
   const [formData, setFormData] = useState<EnquiryForm>({
     fullname: "",
     email: "",
     phone: "",
     message: "",
+  });
+  const [reviewForm, setReviewForm] = useState<ReviewForm>({
+    rating: 5,
+    comment: "",
+  });
+  const [visitForm, setVisitForm] = useState<VisitForm>({
+    scheduledFor: "",
+    visitorPhone: "",
+    note: "",
   });
 
   useEffect(() => {
@@ -169,6 +240,10 @@ const PropertyDetails = () => {
         fullname: user.fullname,
         email: user.email,
       }));
+      setVisitForm((prev) => ({
+        ...prev,
+        visitorPhone: prev.visitorPhone || String(user.phoneNumber || ""),
+      }));
     }
   }, [user]);
 
@@ -240,6 +315,28 @@ const PropertyDetails = () => {
   if (!property)
     return <div className="text-center p-8">Property not found</div>;
 
+  const isLandlordOwner =
+    !!user &&
+    !!property.userId &&
+    typeof property.userId === "object" &&
+    (user.id || user._id) === property.userId._id;
+
+  const priceTrendData = (property.priceHistory || []).map((entry, index) => ({
+    index: index + 1,
+    price: entry.price,
+    date: new Date(entry.changedAt).toLocaleDateString(),
+    reason: entry.reason,
+  }));
+
+  const mapSrc =
+    property.location
+      ? mapMode === "satellite"
+        ? `https://www.google.com/maps?q=${property.location.latitude},${property.location.longitude}&t=k&z=15&output=embed`
+        : mapMode === "nearby"
+        ? `https://www.google.com/maps?q=restaurants%20near%20${property.location.latitude},${property.location.longitude}&z=15&output=embed`
+        : `https://www.google.com/maps?q=${property.location.latitude},${property.location.longitude}&z=15&output=embed`
+      : "";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = Cookies.get("authToken");
@@ -264,6 +361,91 @@ const PropertyDetails = () => {
     } catch (error) {
       console.error("Failed to send enquiry:", error);
       toast.error("Please Login First");
+    }
+  };
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      toast.error("Please log in to leave a review.");
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      const response = await Axios.post(API_ENDPOINTS.PROPERTY.ADD_REVIEW(property._id), reviewForm);
+      setProperty((prev) =>
+        prev
+          ? {
+              ...prev,
+              reviews: response.data.reviews,
+              trustScore: response.data.trustScore,
+            }
+          : prev
+      );
+      setReviewForm({ rating: 5, comment: "" });
+      toast.success(response.data.message || "Review saved");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to save review");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const handleVisitSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      toast.error("Please log in to book a visit.");
+      return;
+    }
+
+    try {
+      setIsSchedulingVisit(true);
+      const response = await Axios.post(
+        API_ENDPOINTS.PROPERTY.SCHEDULE_VISIT(property._id),
+        visitForm
+      );
+      setProperty((prev) =>
+        prev
+          ? {
+              ...prev,
+              visitSchedules: response.data.visitSchedules,
+              trustScore: response.data.trustScore,
+            }
+          : prev
+      );
+      setVisitForm((prev) => ({ ...prev, scheduledFor: "", note: "" }));
+      toast.success(response.data.message || "Visit scheduled");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to schedule visit");
+    } finally {
+      setIsSchedulingVisit(false);
+    }
+  };
+
+  const handleVisitStatusUpdate = async (
+    visitId: string,
+    status: "Approved" | "Rejected" | "Completed"
+  ) => {
+    try {
+      const response = await Axios.patch(
+        API_ENDPOINTS.PROPERTY.UPDATE_VISIT_STATUS(property._id, visitId),
+        { status }
+      );
+      setProperty((prev) =>
+        prev
+          ? {
+              ...prev,
+              visitSchedules: response.data.visitSchedules,
+              trustScore: response.data.trustScore,
+            }
+          : prev
+      );
+      toast.success(response.data.message || "Visit updated");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update visit");
     }
   };
 
@@ -391,27 +573,68 @@ const PropertyDetails = () => {
 
               {property.location ? (
                 <div className="bg-white border rounded-sm overflow-hidden">
-                  <div className="p-4 border border-white border-b-gray-200 w-full flex items-center justify-between gap-4">
-                    <div>
-                      <h1 className="text-lg font-medium">Property Location</h1>
-                      <p className="text-sm text-gray-600">{property.location.mapLabel}</p>
+                  <div className="grid lg:grid-cols-[18rem_minmax(0,1fr)]">
+                    <div className="border-r border-gray-200 p-4 space-y-4 bg-[#f8fafc]">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+                          Zillow-style map panel
+                        </p>
+                        <h1 className="text-xl font-semibold mt-2">Explore the area</h1>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Switch views and inspect the property location, satellite imagery, and nearby conveniences.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { key: "map", label: "Map" },
+                          { key: "satellite", label: "Satellite" },
+                          { key: "nearby", label: "Nearby" },
+                        ].map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => setMapMode(item.key as "map" | "satellite" | "nearby")}
+                            className={`rounded-sm border px-3 py-2 text-sm cursor-pointer ${
+                              mapMode === item.key
+                                ? "bg-[#1E293B] text-white border-[#1E293B]"
+                                : "bg-white text-gray-700 border-gray-300"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="rounded-sm bg-white border border-gray-200 p-4 space-y-2">
+                        <p className="font-medium">{property.location.mapLabel}</p>
+                        <p className="text-sm text-gray-600">{property.address}</p>
+                        <p className="text-xs text-gray-500">
+                          {property.location.latitude.toFixed(4)}, {property.location.longitude.toFixed(4)}
+                        </p>
+                      </div>
+                      <a
+                        href={property.location.googleMapsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex text-sm text-[#1A623A] hover:underline"
+                      >
+                        Open in Google Maps
+                      </a>
                     </div>
-                    <a
-                      href={property.location.googleMapsUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm text-[#1A623A] hover:underline"
-                    >
-                      Open in Google Maps
-                    </a>
+                    <div className="relative">
+                      <iframe
+                        title="Property Location Map"
+                        src={mapSrc}
+                        className="w-full h-[28rem] border-0"
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                      <div className="absolute left-4 top-4 bg-white/95 backdrop-blur rounded-sm shadow-md px-4 py-3 max-w-xs border border-gray-200">
+                        <p className="text-sm font-semibold">{property.title}</p>
+                        <p className="text-xs text-gray-600 mt-1">{property.location.mapLabel}</p>
+                        <p className="text-sm text-[#205D3B] font-semibold mt-2">NRS. {property.price}</p>
+                      </div>
+                    </div>
                   </div>
-                  <iframe
-                    title="Property Location Map"
-                    src={`https://www.google.com/maps?q=${property.location.latitude},${property.location.longitude}&z=15&output=embed`}
-                    className="w-full h-80 border-0"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
                 </div>
               ) : null}
 
@@ -455,6 +678,162 @@ const PropertyDetails = () => {
                       day: "numeric",
                     })}
                   </p>
+                </div>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="bg-white border rounded-sm p-5 space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">Rental Trust Score</h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Designed to reduce fake listings, hidden costs, and unsafe landlord concerns.
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-3xl font-bold text-[#205D3B]">
+                        {property.trustScore?.score ?? 0}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {property.trustScore?.label || "Low"} confidence
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between"><span>Verified identity</span><span>+{property.trustScore?.breakdown?.verifiedIdentity ?? 0}</span></div>
+                    <div className="flex justify-between"><span>Past tenant reviews</span><span>+{property.trustScore?.breakdown?.positiveReviews ?? 0}</span></div>
+                    <div className="flex justify-between"><span>Response time</span><span>+{property.trustScore?.breakdown?.responseTime ?? 0}</span></div>
+                    <div className="flex justify-between"><span>Listing accuracy</span><span>+{property.trustScore?.breakdown?.listingAccuracy ?? 0}</span></div>
+                    <div className="flex justify-between"><span>Complaint history</span><span>+{property.trustScore?.breakdown?.complaintHistory ?? 0}</span></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="rounded-sm bg-[#f8fafc] border p-3">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Avg rating</p>
+                      <p className="text-xl font-semibold mt-1">{property.trustScore?.averageRating || 0}/5</p>
+                    </div>
+                    <div className="rounded-sm bg-[#f8fafc] border p-3">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Response rate</p>
+                      <p className="text-xl font-semibold mt-1">{property.trustScore?.responseRate || 0}%</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border rounded-sm p-5 space-y-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">Rental History & Price Trends</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Helps renters judge whether the current rent looks stable or aggressively increased.
+                    </p>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={priceTrendData}>
+                        <XAxis dataKey="date" hide />
+                        <YAxis />
+                        <Tooltip
+                          formatter={(value: number) => [`NRS. ${value}`, "Price"]}
+                          labelFormatter={(label) => `Date: ${label}`}
+                        />
+                        <Line type="monotone" dataKey="price" stroke="#1E293B" strokeWidth={3} dot />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {(property.priceHistory || []).slice().reverse().map((entry, index) => (
+                      <div key={`${entry.changedAt}-${index}`} className="flex items-center justify-between rounded-sm border px-3 py-2">
+                        <div>
+                          <p className="font-medium">NRS. {entry.price}</p>
+                          <p className="text-gray-500">{entry.reason}</p>
+                        </div>
+                        <p className="text-gray-500">
+                          {new Date(entry.changedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="bg-white border rounded-sm p-5 space-y-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">Tenant Reviews</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Verified renters can leave feedback that directly improves or reduces trust.
+                    </p>
+                  </div>
+                  <form onSubmit={handleReviewSubmit} className="space-y-3">
+                    <div>
+                      <label className="text-sm text-gray-600">Rating</label>
+                      <select
+                        value={reviewForm.rating}
+                        onChange={(e) =>
+                          setReviewForm((prev) => ({ ...prev, rating: Number(e.target.value) }))
+                        }
+                        className="w-full border p-3 rounded-sm mt-1"
+                      >
+                        {[5, 4, 3, 2, 1].map((rating) => (
+                          <option key={rating} value={rating}>
+                            {rating} Stars
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600">Review</label>
+                      <textarea
+                        value={reviewForm.comment}
+                        onChange={(e) =>
+                          setReviewForm((prev) => ({ ...prev, comment: e.target.value }))
+                        }
+                        className="w-full border p-3 rounded-sm mt-1 h-28 resize-none"
+                        placeholder="Share your experience with the property and landlord"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingReview}
+                      className="px-5 py-3 bg-[#1E293B] text-white rounded-sm"
+                    >
+                      {isSubmittingReview ? "Saving..." : "Submit Review"}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="bg-white border rounded-sm p-5 space-y-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">What renters are saying</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Positive reviews add points; complaints and bad experiences reduce confidence.
+                    </p>
+                  </div>
+                  <div className="space-y-3 max-h-[25rem] overflow-y-auto pr-1">
+                    {(property.reviews || []).length ? (
+                      property.reviews
+                        .slice()
+                        .reverse()
+                        .map((review) => (
+                          <div key={review._id} className="rounded-sm border p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{review.fullname}</p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(review.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 text-amber-500">
+                                <FaStar />
+                                <span className="text-sm font-medium text-gray-700">{review.rating}/5</span>
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-3">{review.comment}</p>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No reviews yet for this property.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -569,6 +948,109 @@ const PropertyDetails = () => {
                       {isSending ? "Sending...." : "Send Message"}
                     </button>
                   </form>
+                </div>
+
+                <hr className=" border-dashed" />
+
+                <div className="space-y-5 px-6 py-10">
+                  <h1 className="text-xl">Visit Scheduling System</h1>
+                  <p className="text-sm text-gray-600">
+                    Book a viewing slot and the landlord can approve, reject, or mark it completed.
+                  </p>
+                  {!isLandlordOwner ? (
+                    <form onSubmit={handleVisitSubmit} className="space-y-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-base text-gray-600">Preferred date & time</label>
+                        <input
+                          type="datetime-local"
+                          value={visitForm.scheduledFor}
+                          onChange={(e) =>
+                            setVisitForm((prev) => ({ ...prev, scheduledFor: e.target.value }))
+                          }
+                          className="w-full border p-2"
+                          required
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-base text-gray-600">Phone Number</label>
+                        <input
+                          type="tel"
+                          value={visitForm.visitorPhone}
+                          onChange={(e) =>
+                            setVisitForm((prev) => ({ ...prev, visitorPhone: e.target.value }))
+                          }
+                          className="w-full border p-2"
+                          required
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-base text-gray-600">Note</label>
+                        <textarea
+                          value={visitForm.note}
+                          onChange={(e) =>
+                            setVisitForm((prev) => ({ ...prev, note: e.target.value }))
+                          }
+                          className="w-full border p-2 h-28 resize-none"
+                          placeholder="Share any preferred timing or questions"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isSchedulingVisit}
+                        className="w-full py-3 bg-[#1E293B] text-white hover:bg-[#0f172a] transition-colors"
+                      >
+                        {isSchedulingVisit ? "Booking..." : "Book Visit"}
+                      </button>
+                    </form>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      As the landlord, you can manage incoming visit requests below.
+                    </p>
+                  )}
+
+                  <div className="space-y-3">
+                    {(property.visitSchedules || []).length ? (
+                      property.visitSchedules
+                        .slice()
+                        .reverse()
+                        .map((visit) => (
+                          <div key={visit._id} className="border rounded-sm p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{visit.visitorName}</p>
+                                <p className="text-sm text-gray-600">{visit.visitorEmail}</p>
+                                <p className="text-sm text-gray-600">{visit.visitorPhone}</p>
+                              </div>
+                              <span className="text-xs px-2 py-1 rounded-full bg-gray-100 border">
+                                {visit.status}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              {new Date(visit.scheduledFor).toLocaleString()}
+                            </p>
+                            {visit.note ? (
+                              <p className="text-sm text-gray-600">{visit.note}</p>
+                            ) : null}
+                            {isLandlordOwner ? (
+                              <div className="flex flex-wrap gap-2">
+                                {(["Approved", "Rejected", "Completed"] as const).map((status) => (
+                                  <button
+                                    key={status}
+                                    type="button"
+                                    onClick={() => handleVisitStatusUpdate(visit._id, status)}
+                                    className="px-3 py-2 text-sm border rounded-sm hover:bg-gray-50"
+                                  >
+                                    Mark {status}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No visit requests yet.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

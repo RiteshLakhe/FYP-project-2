@@ -1,5 +1,50 @@
 const mongoose = require("mongoose");
 
+const propertyReviewSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    fullname: { type: String, required: true },
+    rating: { type: Number, required: true, min: 1, max: 5 },
+    comment: { type: String, required: true, trim: true },
+  },
+  { timestamps: true }
+);
+
+const visitScheduleSchema = new mongoose.Schema(
+  {
+    visitorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    visitorName: { type: String, required: true },
+    visitorEmail: { type: String, required: true },
+    visitorPhone: { type: String, required: true },
+    scheduledFor: { type: Date, required: true },
+    note: { type: String, trim: true, default: "" },
+    status: {
+      type: String,
+      enum: ["Pending", "Approved", "Rejected", "Completed"],
+      default: "Pending",
+    },
+    responseMinutes: { type: Number, default: null },
+  },
+  { timestamps: true }
+);
+
+const priceHistorySchema = new mongoose.Schema(
+  {
+    price: { type: Number, required: true },
+    changedAt: { type: Date, default: Date.now },
+    reason: { type: String, trim: true, default: "Initial listing" },
+  },
+  { _id: false }
+);
+
 const propertySchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
@@ -88,6 +133,50 @@ const propertySchema = new mongoose.Schema(
       longitude: { type: Number, required: true },
       mapLabel: { type: String, required: true },
       googleMapsUrl: { type: String, required: true },
+    },
+
+    verifiedListing: {
+      type: Boolean,
+      default: true,
+    },
+
+    complaintsCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    reviews: {
+      type: [propertyReviewSchema],
+      default: [],
+    },
+
+    visitSchedules: {
+      type: [visitScheduleSchema],
+      default: [],
+    },
+
+    priceHistory: {
+      type: [priceHistorySchema],
+      default: [],
+    },
+
+    trustScore: {
+      score: { type: Number, default: 0 },
+      label: {
+        type: String,
+        enum: ["Low", "Moderate", "High", "Excellent"],
+        default: "Low",
+      },
+      breakdown: {
+        verifiedIdentity: { type: Number, default: 0 },
+        positiveReviews: { type: Number, default: 0 },
+        responseTime: { type: Number, default: 0 },
+        listingAccuracy: { type: Number, default: 0 },
+        complaintHistory: { type: Number, default: 0 },
+      },
+      responseRate: { type: Number, default: 0 },
+      averageRating: { type: Number, default: 0 },
     },
 
     userId: {

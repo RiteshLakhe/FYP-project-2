@@ -13,6 +13,92 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 const validStatuses = ["Active", "Inactive", "Pending", "Rented"];
+const validVisitStatuses = ["Pending", "Approved", "Rejected", "Completed"];
+
+const getTrustLabel = (score) => {
+  if (score >= 85) return "Excellent";
+  if (score >= 70) return "High";
+  if (score >= 50) return "Moderate";
+  return "Low";
+};
+
+const calculateTrustScore = (property, owner) => {
+  const averageRating = property.reviews.length
+    ? property.reviews.reduce((sum, review) => sum + review.rating, 0) /
+      property.reviews.length
+    : 0;
+
+  const approvedOrCompletedVisits = property.visitSchedules.filter((visit) =>
+    ["Approved", "Completed"].includes(visit.status)
+  );
+
+  const respondedVisits = property.visitSchedules.filter(
+    (visit) => visit.responseMinutes !== null && visit.responseMinutes !== undefined
+  );
+
+  const averageResponseMinutes = respondedVisits.length
+    ? respondedVisits.reduce((sum, visit) => sum + visit.responseMinutes, 0) /
+      respondedVisits.length
+    : null;
+
+  const verifiedIdentity = owner?.isVerified ? 20 : 0;
+  const positiveReviews = Math.min(
+    30,
+    Math.round((averageRating / 5) * 20 + property.reviews.length * 2)
+  );
+  const responseTime =
+    averageResponseMinutes === null
+      ? 10
+      : averageResponseMinutes <= 60
+      ? 20
+      : averageResponseMinutes <= 240
+      ? 14
+      : averageResponseMinutes <= 1440
+      ? 8
+      : 3;
+  const listingAccuracy = property.verifiedListing && property.imgUrls.length >= 5 ? 15 : 5;
+  const complaintHistory = Math.max(0, 15 - property.complaintsCount * 15);
+  const score =
+    verifiedIdentity +
+    positiveReviews +
+    responseTime +
+    listingAccuracy +
+    complaintHistory;
+
+  return {
+    score,
+    label: getTrustLabel(score),
+    breakdown: {
+      verifiedIdentity,
+      positiveReviews,
+      responseTime,
+      listingAccuracy,
+      complaintHistory,
+    },
+    responseRate: property.visitSchedules.length
+      ? Math.round((approvedOrCompletedVisits.length / property.visitSchedules.length) * 100)
+      : 0,
+    averageRating: Number(averageRating.toFixed(1)),
+  };
+};
+
+const attachDerivedPropertyState = async (property) => {
+  const owner = await userModel.findById(property.userId).select("isVerified");
+  property.trustScore = calculateTrustScore(property, owner);
+
+  if (!property.priceHistory.length) {
+    property.priceHistory = [
+      {
+        price: property.price,
+        changedAt: property.createdAt || new Date(),
+        reason: "Initial listing",
+      },
+    ];
+  }
+
+  await property.save();
+  return property;
+};
 
 const uploadImages = async (files) => {
   const uploads = files.map(async (file) => {
@@ -82,6 +168,13 @@ const createProperty = async (req, res) => {
       imgUrls,
       location: buildLocation(formData),
       userId: req.params.id,
+      priceHistory: [
+        {
+          price: Number(formData.price),
+          changedAt: new Date(),
+          reason: "Initial listing",
+        },
+      ],
     });
 
     await newProperty.save();
@@ -99,6 +192,8 @@ const createProperty = async (req, res) => {
       user.currentRole = "landlord";
       await user.save();
     }
+
+    await attachDerivedPropertyState(newProperty);
 
     res.status(201).json({
       success: true,
@@ -144,7 +239,7 @@ const getAllProperties = async (req, res) => {
 
     const properties = await propertyModel
       .find(query)
-      .populate("userId", "fullname email phoneNumber profileImage")
+      .populate("userId", "fullname email phoneNumber profileImage isVerified")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -163,13 +258,18 @@ const getPropertyById = async (req, res) => {
   try {
     const property = await propertyModel
       .findById(req.params.id)
-      .populate("userId", "fullname email phoneNumber profileImage");
+      .populate("userId", "fullname email phoneNumber profileImage isVerified")
+      .populate("reviews.userId", "fullname profileImage")
+      .populate("visitSchedules.visitorId", "fullname email profileImage");
     if (!property) {
       return res.status(404).json({
         success: false,
         message: "Property not found",
       });
     }
+
+    await attachDerivedPropertyState(property);
+
     res.status(200).json({
       success: true,
       property,
@@ -203,7 +303,7 @@ const getPropertiesByOwner = async (req, res) => {
 
     const properties = await propertyModel
       .find({ userId: userId })
-      .populate("userId", "fullname email phoneNumber profileImage");
+      .populate("userId", "fullname email phoneNumber profileImage isVerified");
 
     res.status(200).json({
       success: true,
@@ -255,9 +355,27 @@ const updateProperty = async (req, res) => {
       delete updates.mapLabel;
     }
 
+    if (updates.price !== undefined) {
+      const nextPrice = Number(updates.price);
+      if (!Number.isNaN(nextPrice) && nextPrice !== existingProperty.price) {
+        updates.$push = {
+          priceHistory: {
+            price: nextPrice,
+            changedAt: new Date(),
+            reason: req.body.priceChangeReason || "Price updated",
+          },
+        };
+      }
+    }
+
     const updatedProperty = await propertyModel.findByIdAndUpdate(
       req.params.id,
-      { $set: updates },
+      {
+        $set: Object.fromEntries(
+          Object.entries(updates).filter(([key]) => key !== "$push" && key !== "priceChangeReason")
+        ),
+        ...(updates.$push ? { $push: updates.$push } : {}),
+      },
       { new: true, runValidators: true }
     );
 
@@ -267,6 +385,8 @@ const updateProperty = async (req, res) => {
         message: "Property not found",
       });
     }
+
+    await attachDerivedPropertyState(updatedProperty);
 
     res.status(200).json({
       success: true,
@@ -347,6 +467,150 @@ const deleteProperty = async (req, res) => {
   }
 };
 
+const addPropertyReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+
+    const property = await propertyModel.findById(id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: "Property not found" });
+    }
+
+    if (property.userId.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "Landlords cannot review their own property",
+      });
+    }
+
+    const existingReview = property.reviews.find(
+      (review) => review.userId.toString() === req.user._id.toString()
+    );
+
+    if (existingReview) {
+      existingReview.rating = Number(rating);
+      existingReview.comment = comment;
+    } else {
+      property.reviews.push({
+        userId: req.user._id,
+        fullname: req.user.fullname,
+        rating: Number(rating),
+        comment,
+      });
+    }
+
+    await attachDerivedPropertyState(property);
+    await property.populate("reviews.userId", "fullname profileImage");
+
+    return res.status(200).json({
+      success: true,
+      message: existingReview ? "Review updated" : "Review added",
+      reviews: property.reviews,
+      trustScore: property.trustScore,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save review",
+    });
+  }
+};
+
+const scheduleVisit = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { scheduledFor, note, visitorPhone } = req.body;
+
+    const property = await propertyModel.findById(id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: "Property not found" });
+    }
+
+    if (property.userId.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot schedule a visit for your own property",
+      });
+    }
+
+    property.visitSchedules.push({
+      visitorId: req.user._id,
+      visitorName: req.user.fullname,
+      visitorEmail: req.user.email,
+      visitorPhone: visitorPhone || req.user.phoneNumber?.toString() || "",
+      scheduledFor,
+      note: note || "",
+    });
+
+    await attachDerivedPropertyState(property);
+    await property.populate("visitSchedules.visitorId", "fullname email profileImage");
+
+    return res.status(201).json({
+      success: true,
+      message: "Visit request submitted",
+      visitSchedules: property.visitSchedules,
+      trustScore: property.trustScore,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to schedule visit",
+    });
+  }
+};
+
+const updateVisitScheduleStatus = async (req, res) => {
+  try {
+    const { id, visitId } = req.params;
+    const { status } = req.body;
+
+    if (!validVisitStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid visit status" });
+    }
+
+    const property = await propertyModel.findById(id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: "Property not found" });
+    }
+
+    if (property.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    const visit = property.visitSchedules.id(visitId);
+    if (!visit) {
+      return res.status(404).json({ success: false, message: "Visit request not found" });
+    }
+
+    visit.status = status;
+    if (visit.createdAt) {
+      visit.responseMinutes = Math.max(
+        0,
+        Math.round((Date.now() - new Date(visit.createdAt).getTime()) / 60000)
+      );
+    }
+
+    await attachDerivedPropertyState(property);
+    await property.populate("visitSchedules.visitorId", "fullname email profileImage");
+
+    return res.status(200).json({
+      success: true,
+      message: "Visit status updated",
+      visitSchedules: property.visitSchedules,
+      trustScore: property.trustScore,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update visit status",
+    });
+  }
+};
+
 module.exports = {
   upload,
   createProperty,
@@ -356,4 +620,7 @@ module.exports = {
   updateProperty,
   deleteProperty,
   updatePropertyStatus,
+  addPropertyReview,
+  scheduleVisit,
+  updateVisitScheduleStatus,
 };
