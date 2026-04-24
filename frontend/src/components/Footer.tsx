@@ -58,7 +58,7 @@ const Footer = () => {
 
         <hr className="w-full" />
         <div className="mt-5 mb-10 flex flex-col md:flex-row w-full gap-5 md:gap-0 md:items-center justify-between">
-          <p>© 2024 Rent Ease . All Right Reserved</p>
+          <p>© 2026 Rent Ease . All Right Reserved</p>
           <div className="space-y-2">
             <p>Follow us on</p>
             <div className="w-full flex flex-row md:justify-between gap-8">
