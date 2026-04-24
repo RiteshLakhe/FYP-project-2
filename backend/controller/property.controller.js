@@ -34,6 +34,26 @@ const uploadImages = async (files) => {
   return Promise.all(uploads);
 };
 
+const buildLocation = (body) => {
+  const latitude = Number(body.latitude ?? body.location?.latitude);
+  const longitude = Number(body.longitude ?? body.location?.longitude);
+  const mapLabel =
+    body.mapLabel ||
+    body.location?.mapLabel ||
+    [body.address, body.city].filter(Boolean).join(", ");
+
+  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    throw new Error("Valid latitude and longitude are required");
+  }
+
+  return {
+    latitude,
+    longitude,
+    mapLabel,
+    googleMapsUrl: `https://www.google.com/maps?q=${latitude},${longitude}`,
+  };
+};
+
 const createProperty = async (req, res) => {
   try {
     const formData = req.body;
@@ -53,9 +73,14 @@ const createProperty = async (req, res) => {
         .json({ success: false, message: "Invalid user ID" });
     }
 
+    if (req.user._id.toString() !== req.params.id) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
     const newProperty = new propertyModel({
       ...formData,
       imgUrls,
+      location: buildLocation(formData),
       userId: req.params.id,
     });
 
@@ -103,7 +128,7 @@ const createProperty = async (req, res) => {
 
 const getAllProperties = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, includeInactive } = req.query;
     const query = {};
 
     if (status) {
@@ -113,9 +138,14 @@ const getAllProperties = async (req, res) => {
           .json({ success: false, message: "Invalid status filter" });
       }
       query.status = status;
+    } else if (includeInactive !== "true") {
+      query.status = "Active";
     }
 
-    const properties = await propertyModel.find(query).sort({ createdAt: -1 });
+    const properties = await propertyModel
+      .find(query)
+      .populate("userId", "fullname email phoneNumber profileImage")
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -131,7 +161,9 @@ const getAllProperties = async (req, res) => {
 
 const getPropertyById = async (req, res) => {
   try {
-    const property = await propertyModel.findById(req.params.id);
+    const property = await propertyModel
+      .findById(req.params.id)
+      .populate("userId", "fullname email phoneNumber profileImage");
     if (!property) {
       return res.status(404).json({
         success: false,
@@ -171,7 +203,7 @@ const getPropertiesByOwner = async (req, res) => {
 
     const properties = await propertyModel
       .find({ userId: userId })
-      .populate("userId", "fullname email");
+      .populate("userId", "fullname email phoneNumber profileImage");
 
     res.status(200).json({
       success: true,
@@ -191,12 +223,36 @@ const updateProperty = async (req, res) => {
   try {
     const updates = req.body;
 
+    const existingProperty = await propertyModel.findById(req.params.id);
+    if (!existingProperty) {
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    if (existingProperty.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
     if (updates.status && !validStatuses.includes(updates.status)) {
       return res.status(400).json({
         success: false,
         message:
           "Invalid property status. Must be one of: Active, Inactive, Pending, Rented",
       });
+    }
+
+    if (
+      updates.latitude !== undefined ||
+      updates.longitude !== undefined ||
+      updates.mapLabel !== undefined ||
+      updates.location
+    ) {
+      updates.location = buildLocation(updates);
+      delete updates.latitude;
+      delete updates.longitude;
+      delete updates.mapLabel;
     }
 
     const updatedProperty = await propertyModel.findByIdAndUpdate(
@@ -263,7 +319,7 @@ const updatePropertyStatus = async (req, res) => {
 const deleteProperty = async (req, res) => {
   try {
     const { id } = req.params;
-    const property = await propertyModel.findByIdAndDelete(id);
+    const property = await propertyModel.findById(id);
 
     if (!property) {
       return res.status(404).json({
@@ -271,6 +327,12 @@ const deleteProperty = async (req, res) => {
         message: "Property not found",
       });
     }
+
+    if (property.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    await property.deleteOne();
 
     res.status(200).json({
       success: true,

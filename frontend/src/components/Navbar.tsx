@@ -38,6 +38,11 @@ const Navbar = () => {
 
   useEffect(() => {
     const fetchUser = async () => {
+      if (!userId) {
+        setUserData(null);
+        return;
+      }
+
       try {
         const res = await Axios.get(API_ENDPOINTS.USER.GET_USER_BY_ID(userId));
         setUserData(res.data.user);
@@ -176,16 +181,16 @@ const Navbar = () => {
                   <div className="flex items-center border rounded-sm gap-2 py-2 px-4 bg-white hover:bg-gray-50 cursor-pointer">
                     <div
                       className="w-10 h-10 rounded-full text-white flex items-center justify-center cursor-pointer"
-                      onClick={() => navigate("/profile")}>
+                      onClick={() => navigate("/dashboard/personal-info")}>
                       <img
-                        src={`${userData?.profileImage}`}
+                        src={userData?.profileImage || user?.profileImage}
                         alt="Profile Image"
                         className="w-full h-full object-cover rounded-full"
                       />
                     </div>
 
                     <span className="font-normal text-sm">
-                      {userData?.fullname}
+                      {userData?.fullname || user?.fullname}
                     </span>
                     <IoIosArrowDown />
                   </div>
@@ -242,14 +247,14 @@ const Navbar = () => {
                   onClick={handleProfile}>
                   <div className="w-8 h-8 rounded-full text-white flex items-center justify-center cursor-pointer">
                     <img
-                      src={userData?.profileImage}
+                      src={userData?.profileImage || user?.profileImage}
                       alt="Profile Image"
                       className="w-full h-full object-cover rounded-full"
                     />
                   </div>
 
                   <span className="font-normal text-sm">
-                    {userData?.fullname}
+                    {userData?.fullname || user?.fullname}
                   </span>
                 </div>
               ) : (

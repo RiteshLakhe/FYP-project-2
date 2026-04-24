@@ -18,6 +18,15 @@ interface User {
   _id: string;
   fullname: string;
   email: string;
+  phoneNumber?: string;
+  profileImage?: string;
+}
+
+interface PropertyLocation {
+  latitude: number;
+  longitude: number;
+  mapLabel: string;
+  googleMapsUrl: string;
 }
 
 interface Property {
@@ -49,7 +58,8 @@ interface Property {
   imgUrls?: string[];
   forSale?: boolean;
   description?: string;
-  userId?: string;
+  userId?: string | User;
+  location?: PropertyLocation;
   createdAt: string;
 }
 
@@ -171,19 +181,21 @@ const PropertyDetails = () => {
         const propertyData = response.data.property;
         setProperty(propertyData);
 
-        if (propertyData.userId) {
-          const userResponse = await Axios.get(
-            API_ENDPOINTS.USER.GET_USER_BY_ID(propertyData.userId)
-          );
-          setOwnerName(userResponse.data.user?.fullname || "Unknown");
-          setOwnerNumber(userResponse.data.user?.phoneNumber || "Unknown");
-          setOwnerEmail(userResponse.data.user?.email || "Unknown");
-          setOwnerPrrofileImg(userResponse.data.user?.profileImage);
+        const owner =
+          propertyData.userId && typeof propertyData.userId === "object"
+            ? propertyData.userId
+            : null;
 
-          timer = setTimeout(() => {
-            setLoading(false);
-          }, 1000);
+        if (owner) {
+          setOwnerName(owner.fullname || "Unknown");
+          setOwnerNumber(owner.phoneNumber || "Unknown");
+          setOwnerEmail(owner.email || "Unknown");
+          setOwnerPrrofileImg(owner.profileImage || "");
         }
+
+        timer = setTimeout(() => {
+          setLoading(false);
+        }, 1000);
       } catch (error) {
         console.error("Failed to fetch property or owner:", error);
         setLoading(false);
@@ -285,7 +297,7 @@ const PropertyDetails = () => {
                   <h1 className="text-2xl font-semibold">{property.title}</h1>
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <FaLocationDot />
-                    <span>{property.address}</span>
+                    <span>{property.location?.mapLabel || property.address}</span>
                   </div>
                   <p className=" font-semibold ">
                     <span className="text-lg text-[#205D3B]">
@@ -377,6 +389,32 @@ const PropertyDetails = () => {
                 </div>
               </div>
 
+              {property.location ? (
+                <div className="bg-white border rounded-sm overflow-hidden">
+                  <div className="p-4 border border-white border-b-gray-200 w-full flex items-center justify-between gap-4">
+                    <div>
+                      <h1 className="text-lg font-medium">Property Location</h1>
+                      <p className="text-sm text-gray-600">{property.location.mapLabel}</p>
+                    </div>
+                    <a
+                      href={property.location.googleMapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-[#1A623A] hover:underline"
+                    >
+                      Open in Google Maps
+                    </a>
+                  </div>
+                  <iframe
+                    title="Property Location Map"
+                    src={`https://www.google.com/maps?q=${property.location.latitude},${property.location.longitude}&z=15&output=embed`}
+                    className="w-full h-80 border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              ) : null}
+
               <div className="bg-white border rounded-sm">
                 <div className="p-4 border border-white border-b-gray-200 w-full">
                   <h1 className="text-lg font-medium">Overview</h1>
@@ -399,14 +437,14 @@ const PropertyDetails = () => {
                   <p>{property.municipality}</p>
                   <p>Ward No.: </p>
                   <p>{property.wardNo}</p>
+                  <p>Map Label:</p>
+                  <p>{property.location?.mapLabel || "Not added"}</p>
                   <p>Total Area: </p>
                   <p>{property.totalArea} sqft</p>
                   <p>Dimension: </p>
                   <p>{property.dimension} sqft</p>
                   <p>FLoor: </p>
                   <p>{property.floor}</p>
-                  <p>Attached Bathroom: </p>
-                  <p>{property.attachedBathroom}</p>
                   <p>Attached Bathroom: </p>
                   <p>{property.attachedBathroom}</p>
                   <p>Date Posted: </p>

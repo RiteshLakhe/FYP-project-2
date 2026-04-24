@@ -46,9 +46,24 @@ const Signin = () => {
       const response = await Axios.post(API_ENDPOINTS.AUTH.LOGIN, {
         email: data.email,
         password: data.password,
+        rememberMe: data.rememberMe,
       });
 
-      const { success, user, token } = response.data;
+      const { success, user, token, requiresTwoStepVerification } = response.data;
+
+      if (requiresTwoStepVerification) {
+        toast.success("Verification code sent to your email.", {
+          position: "top-right",
+          autoClose: 2000,
+        });
+
+        navigate(
+          `/registration/otp-verification?email=${encodeURIComponent(
+            data.email
+          )}&mode=login&rememberMe=${data.rememberMe ? "true" : "false"}`
+        );
+        return;
+      }
 
       if (success && user && token) {
         const {

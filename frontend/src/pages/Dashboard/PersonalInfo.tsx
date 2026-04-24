@@ -20,6 +20,7 @@ import Cookies from "js-cookie";
 import { API_ENDPOINTS } from "@/services/Endpoints";
 import { Axios } from "@/services/AxiosInstance";
 import { toast } from "react-toastify";
+import { useUser } from "@/context/UserContext";
 
 interface User {
   _id: string;
@@ -30,6 +31,7 @@ interface User {
 }
 
 const PersonalInfo = () => {
+  const { setUser: setContextUser, user: currentUser } = useUser();
   const [user, setUser] = useState<User | null>(null);
   const [editField, setEditField] = useState<keyof User | null>(null);
   const [tempValue, setTempValue] = useState("");
@@ -70,6 +72,19 @@ const PersonalInfo = () => {
           },
         }
       );
+
+      setContextUser(
+        {
+          id: user._id,
+          fullname: user.fullname,
+          phoneNumber: user.phoneNumber,
+          email: user.email,
+          profileImage: previewUrl || user.profileImage,
+          roles: currentUser?.roles || ["tenant"],
+          currentRole: currentUser?.currentRole || "tenant",
+        },
+        true
+      );
   
       toast.success("Profile Picture Updated!", {
         position: "top-right",
@@ -97,6 +112,20 @@ const PersonalInfo = () => {
         await Axios.put(
           API_ENDPOINTS.USER.UPDATE_USER(user._id),
           updatedField
+        );
+
+        setContextUser(
+          {
+            id: user._id,
+            fullname: editField === "fullname" ? tempValue : user.fullname,
+            phoneNumber:
+              editField === "phoneNumber" ? Number(tempValue) : user.phoneNumber,
+            email: editField === "email" ? tempValue : user.email,
+            profileImage: user.profileImage,
+            roles: currentUser?.roles || ["tenant"],
+            currentRole: currentUser?.currentRole || "tenant",
+          },
+          true
         );
   
         setEditField(null);

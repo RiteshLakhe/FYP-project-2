@@ -12,12 +12,15 @@ import { toast } from "react-toastify";
 export type PropertyFormData = {
   title: string;
   description: string;
-  category: "Room" | "Apartment" | "Commercial Space";
+  category: "Room" | "Appartment" | "Commercial Space";
   propertyType: "Residential" | "Commercial";
   address: string;
   city: string;
   municipality: string;
   wardNo: string;
+  mapLabel: string;
+  latitude: number;
+  longitude: number;
   totalArea: number;
   floor: string;
   dimension: number;
@@ -65,6 +68,9 @@ const AddPropertyForm= () => {
 
   const category = watch("category");
   const isNegotiable = watch("negotiable");
+  const latitude = watch("latitude");
+  const longitude = watch("longitude");
+  const mapLabel = watch("mapLabel");
 
   const onSubmit = async (data: PropertyFormData) => {
     const formData = new FormData();
@@ -271,7 +277,71 @@ const AddPropertyForm= () => {
                   </p>
                 )}
               </div>
+              <div>
+                <label htmlFor="mapLabel">Map Label</label>
+                <input
+                  type="text"
+                  className="w-full border p-3 rounded-xs text-gray-700 border-gray-300"
+                  placeholder="e.g. Jawalakhel, Lalitpur"
+                  {...register("mapLabel", { required: "Map label is required" })}
+                />
+                {errors.mapLabel && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.mapLabel.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="latitude">Latitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  className="w-full border p-3 rounded-xs text-gray-700 border-gray-300"
+                  placeholder="e.g. 27.7172"
+                  {...register("latitude", {
+                    required: "Latitude is required",
+                    valueAsNumber: true,
+                  })}
+                />
+                {errors.latitude && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.latitude.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="longitude">Longitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  className="w-full border p-3 rounded-xs text-gray-700 border-gray-300"
+                  placeholder="e.g. 85.3240"
+                  {...register("longitude", {
+                    required: "Longitude is required",
+                    valueAsNumber: true,
+                  })}
+                />
+                {errors.longitude && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.longitude.message}
+                  </p>
+                )}
+              </div>
             </div>
+            {latitude && longitude ? (
+              <div className="border rounded-sm overflow-hidden">
+                <div className="px-4 py-3 border-b bg-gray-50 text-sm text-gray-700">
+                  Map preview for {mapLabel || "selected location"}
+                </div>
+                <iframe
+                  title="Property Location Preview"
+                  src={`https://www.google.com/maps?q=${latitude},${longitude}&z=15&output=embed`}
+                  className="w-full h-72 border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-6">

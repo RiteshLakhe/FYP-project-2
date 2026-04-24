@@ -1,5 +1,5 @@
 const connectDB = require("../config/dbcon");
-const propertyModel = require("../model/property.model");
+const { bootstrapData } = require("./bootstrapData");
 
 const dummyProperties = [{
   "title": "Commercial Space in Jawalakhel",
@@ -45,7 +45,7 @@ const dummyProperties = [{
 const seedProperties = async () => {
   try {
     await connectDB();
-    await propertyModel.insertMany(dummyProperties);
+    const summary = await bootstrapData();
     console.log("✅ Dummy properties inserted successfully.");
     process.exit(0);
   } catch (err) {

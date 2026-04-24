@@ -7,6 +7,7 @@ const {
   deleteUser,
   switchRole,
   verifyOtp,
+  resendSignupOtp,
   saveProperty,
   getSavedProperties,
   unsaveProperty,
@@ -17,13 +18,14 @@ const {
 const { protect } = require("../middleware/auth.middleware");
 const router = express.Router();
 
-router.post("/registerUser", createUser);
+router.post("/registerUser", upload.single("profileImage"), createUser);
 router.get("/getAllUsers", getAllUsers);
 router.get("/getUserById/:id", getUserById);
 router.put("/updateUser/:id", protect, upload.single('profileImage'), updateUser);
 router.delete("/deleteUser/:id", protect, deleteUser);
 router.post("/switch-role", protect, switchRole);
 router.post("/verify-otp", verifyOtp)
+router.post("/resend-signup-otp", resendSignupOtp)
 router.post("/save-properties", protect, saveProperty)
 router.get("/get-saved-properties", protect, getSavedProperties)
 router.delete("/unsave-property/:propertyId", protect, unsaveProperty)

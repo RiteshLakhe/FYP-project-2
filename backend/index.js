@@ -5,6 +5,7 @@ const connectDB = require("./config/dbcon");
 const cors = require("cors");
 const mainRoutes = require("./routes/index.routes");
 const path = require("path");
+const { bootstrapData } = require("./utils/bootstrapData");
 
 const corsOption = {
   origin: ["http://localhost:5173", "http://localhost:5174",""],
@@ -20,6 +21,8 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await connectDB();
+    const bootstrapSummary = await bootstrapData();
+    console.log("Bootstrap complete:", bootstrapSummary);
     app.listen(PORT, () => {
       console.log(`Server started at http://localhost:${PORT}/`);
     });

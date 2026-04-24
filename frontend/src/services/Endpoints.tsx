@@ -3,6 +3,9 @@ interface AuthEndpoints {
   REGISTER: string;
   LOGOUT: string;
   OTP: string;
+  VERIFY_LOGIN_OTP: string;
+  RESEND_LOGIN_OTP: string;
+  RESEND_SIGNUP_OTP: string;
   FORGOT_PASSWORD: string;
   RESET_PASSWORD: (token: string) => string;
 }
@@ -39,6 +42,9 @@ export const API_ENDPOINTS: {
     REGISTER: "/user/registerUser",
     LOGOUT: "/auth/logout",
     OTP: "/user/verify-otp",
+    VERIFY_LOGIN_OTP: "/auth/verify-login-otp",
+    RESEND_LOGIN_OTP: "/auth/resend-login-otp",
+    RESEND_SIGNUP_OTP: "/user/resend-signup-otp",
     FORGOT_PASSWORD: "/auth/forgot-password",
     RESET_PASSWORD: (token) => `/auth/reset-password/${token}`,
   },

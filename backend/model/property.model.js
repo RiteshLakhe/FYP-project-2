@@ -83,6 +83,13 @@ const propertySchema = new mongoose.Schema(
       enum: ["Yes", "No"],
     },
 
+    location: {
+      latitude: { type: Number, required: true },
+      longitude: { type: Number, required: true },
+      mapLabel: { type: String, required: true },
+      googleMapsUrl: { type: String, required: true },
+    },
+
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

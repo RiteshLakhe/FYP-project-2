@@ -24,6 +24,8 @@ const VerifyOtp: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const emailFromQuery = searchParams.get("email") || "";
+  const mode = searchParams.get("mode") || "signup";
+  const rememberMe = searchParams.get("rememberMe") === "true";
   const { setUser, user } = useUser();
 
   const {
@@ -60,7 +62,13 @@ const VerifyOtp: React.FC = () => {
         return;
       }
 
-      const response = await Axios.post(API_ENDPOINTS.AUTH.OTP, payload);
+      const response = await Axios.post(
+        mode === "login" ? API_ENDPOINTS.AUTH.VERIFY_LOGIN_OTP : API_ENDPOINTS.AUTH.OTP,
+        {
+          ...payload,
+          rememberMe,
+        }
+      );
       const { message, token, user: userData } = response.data;
 
       if (!userData?.id) {
@@ -84,13 +92,15 @@ const VerifyOtp: React.FC = () => {
           roles: userData.roles,
           currentRole: userData.currentRole,
         },
-        false
+        rememberMe
       );
 
       toast.success(message || "Account verified successfully!", {
         position: "top-right",
         autoClose: 2000,
       });
+
+      navigate(userData.currentRole === "admin" ? "/admin/dashboard" : "/");
 
       
     } catch (error: any) {
@@ -109,7 +119,9 @@ const VerifyOtp: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      <h2 className="text-2xl font-bold mb-6">Verify Your Account</h2>
+      <h2 className="text-2xl font-bold mb-6">
+        {mode === "login" ? "Verify Your Login" : "Verify Your Account"}
+      </h2>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -176,6 +188,27 @@ const VerifyOtp: React.FC = () => {
           }`}
         >
           {isSubmitting ? "Verifying..." : "Verify OTP"}
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await Axios.post(
+                mode === "login"
+                  ? API_ENDPOINTS.AUTH.RESEND_LOGIN_OTP
+                  : API_ENDPOINTS.AUTH.RESEND_SIGNUP_OTP,
+                { email: emailFromQuery }
+              );
+              toast.success("A new OTP has been sent.");
+            } catch (error: any) {
+              toast.error(
+                error.response?.data?.message || "Failed to resend OTP."
+              );
+            }
+          }}
+          className="w-full py-3 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          Resend OTP
         </button>
       </form>
     </div>

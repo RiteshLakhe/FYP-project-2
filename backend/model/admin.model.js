@@ -18,6 +18,9 @@ const adminModel = mongoose.Schema(
       required: [true, "Password is required"],
     },
 
+    loginOtp: String,
+    loginOtpExpires: Date,
+
     roles: {
       type: String,
       enum: ["admin"],

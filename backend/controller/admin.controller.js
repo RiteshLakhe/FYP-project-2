@@ -24,12 +24,15 @@ const registerAdmin = async (req, res) => {
       password: hashedPassword,
     });
 
-    await admin.save();
-
     res.status(200).json({
       success: true,
       message: "Admin created successfully",
-      admin,
+      admin: {
+        id: admin._id,
+        fullname: admin.fullname,
+        email: admin.email,
+        roles: admin.roles,
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -51,7 +54,12 @@ const getAdmin = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: admin,
+      admin: {
+        id: admin._id,
+        fullname: admin.fullname,
+        email: admin.email,
+        roles: admin.roles,
+      },
     });
   } catch (error) {
     res.status(500).json({

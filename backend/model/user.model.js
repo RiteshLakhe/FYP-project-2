@@ -35,6 +35,12 @@ const userSchema = new mongoose.Schema(
 
     otp: String,
     otpExpires: Date,
+    otpPurpose: {
+      type: String,
+      enum: ["signup", "login"],
+    },
+    loginOtp: String,
+    loginOtpExpires: Date,
 
     resetPasswordToken: String,
     resetPasswordExpires: Date,

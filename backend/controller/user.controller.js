@@ -1,15 +1,14 @@
 const userModel = require("../model/user.model");
 const bcrypt = require("bcrypt");
 const { generateToken } = require("../utils/token");
-const crypto = require("crypto");
 const { sendMail: sendEmail, isEmailConfigured } = require("../utils/emailSender");
 const multer = require("multer");
 const DatauriParser = require("datauri/parser");
 const path = require("path");
 const { cloudinary, isCloudinaryConfigured } = require("../utils/cloudinary");
-const mongoose = require("mongoose");
 const { saveLocalFiles } = require("../utils/localUploads");
-require('dotenv').config();
+const { buildOtp, getOtpExpiry, buildOtpEmail } = require("../utils/otp");
+require("dotenv").config();
 
 const parser = new DatauriParser();
 
@@ -40,12 +39,46 @@ const uploadImages = async (files) => {
   return Promise.all(uploads);
 };
 
+const sendSignupOtpEmail = async (user) => {
+  const otp = buildOtp();
+  const otpExpires = getOtpExpiry();
+  const emailContent = buildOtpEmail({
+    fullname: user.fullname,
+    otp,
+    purpose: "signup",
+  });
+
+  user.otp = otp;
+  user.otpExpires = otpExpires;
+  user.otpPurpose = "signup";
+  await user.save();
+
+  await sendEmail({
+    from: `"RentEase Security" <${process.env.EMAIL_USER}>`,
+    to: user.email,
+    subject: emailContent.subject,
+    html: emailContent.html,
+  });
+
+  return otp;
+};
+
+const sanitizeUser = (user) => ({
+  id: user._id,
+  fullname: user.fullname,
+  phoneNumber: user.phoneNumber,
+  profileImage: user.profileImage,
+  email: user.email,
+  roles: user.roles,
+  currentRole: user.currentRole,
+});
+
 const createUser = async (req, res) => {
   const { fullname, phoneNumber, email, password } = req.body;
 
   try {
     const existingUser = await userModel.findOne({ email });
-    if (existingUser) {
+    if (existingUser && existingUser.isVerified) {
       return res.status(400).json({
         success: false,
         message: "User already exists with this email",
@@ -53,37 +86,33 @@ const createUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const uploadedProfileImage = req.file ? (await uploadImages([req.file]))[0] : null;
+    const profileImage =
+      uploadedProfileImage ||
+      `https://avatar.iran.liara.run/username?username=${encodeURIComponent(fullname)}`;
 
-    const newUser = await userModel.create({
-      fullname,
-      phoneNumber,
-      email,
-      password: hashedPassword,
-      profileImage: `https://avatar.iran.liara.run/username?username=${fullname}`,
-      isVerified: true,
-    });
+    const user = existingUser || new userModel({ email });
+    user.fullname = fullname;
+    user.phoneNumber = phoneNumber;
+    user.email = email;
+    user.password = hashedPassword;
+    user.profileImage = profileImage;
+    user.isVerified = false;
+    user.roles = ["tenant"];
+    user.currentRole = "tenant";
 
-    const token = generateToken({
-      id: newUser._id,
-      email: newUser.email,
-      role: newUser.roles,
-      isVerified: newUser.isVerified,
-      currentRole: newUser.currentRole,
-    });
+    await user.save();
+    const devOtp = await sendSignupOtpEmail(user);
 
     return res.status(201).json({
       success: true,
-      message: "User created successfully. Please sign in.",
-      user: {
-        id: newUser._id,
-        fullname: newUser.fullname,
-        phoneNumber: newUser.phoneNumber,
-        profileImage: newUser.profileImage,
-        email: newUser.email,
-        roles: newUser.roles,
-        currentRole: newUser.currentRole,
-      },
-      token,
+      requiresTwoStepVerification: true,
+      message: isEmailConfigured
+        ? "Signup started. Verify the OTP sent to your email to activate the account."
+        : "Email is not configured. Returning OTP for development.",
+      email: user.email,
+      user: sanitizeUser(user),
+      devOtp: isEmailConfigured ? undefined : devOtp,
     });
   } catch (error) {
     res.status(500).json({
@@ -99,22 +128,30 @@ const verifyOtp = async (req, res) => {
 
   try {
     const user = await userModel.findOne({ email });
-    if (!user) return res.status(400).json({ message: "User not found." });
-
-    if (user.isVerified)
-      return res.status(400).json({ message: "User already verified." });
-
-    if (user.otp !== otp.toString().trim()) {
-      return res.status(400).json({ message: "Invalid OTP." });
+    if (!user) {
+      return res.status(400).json({ success: false, message: "User not found." });
     }
 
-    if (user.otpExpires < Date.now()) {
-      return res.status(400).json({ message: "OTP has expired." });
+    if (user.isVerified && user.otpPurpose !== "signup") {
+      return res.status(400).json({ success: false, message: "User already verified." });
+    }
+
+    if (user.otpPurpose !== "signup") {
+      return res.status(400).json({ success: false, message: "No signup verification is pending." });
+    }
+
+    if (user.otp !== otp.toString().trim()) {
+      return res.status(400).json({ success: false, message: "Invalid OTP." });
+    }
+
+    if (!user.otpExpires || user.otpExpires < Date.now()) {
+      return res.status(400).json({ success: false, message: "OTP has expired." });
     }
 
     user.isVerified = true;
     user.otp = undefined;
     user.otpExpires = undefined;
+    user.otpPurpose = undefined;
     await user.save();
 
     const token = generateToken({
@@ -126,21 +163,42 @@ const verifyOtp = async (req, res) => {
     });
 
     res.status(200).json({
+      success: true,
       message: "Account verified successfully!",
       token,
-      user: {
-        id: user._id,
-        fullname: user.fullname,
-        phoneNumber: user.phoneNumber,
-        email: user.email,
-        profileImage: user.profileImage,
-        roles: user.roles,
-        currentRole: user.currentRole,
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error("OTP Verification Error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+const resendSignupOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await userModel.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ success: false, message: "User is already verified." });
+    }
+
+    const devOtp = await sendSignupOtpEmail(user);
+
+    return res.status(200).json({
+      success: true,
+      message: isEmailConfigured
+        ? "A new OTP has been sent to your email."
+        : "Email is not configured. Returning OTP for development.",
+      devOtp: isEmailConfigured ? undefined : devOtp,
+    });
+  } catch (error) {
+    console.error("Resend OTP Error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -195,7 +253,7 @@ const getSavedProperties = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const users = await userModel.find().select("-password");
+    const users = await userModel.find().select("-password -otp -loginOtp -resetPasswordToken");
 
     return res.status(200).json({
       success: true,
@@ -215,8 +273,8 @@ const getUserById = async (req, res) => {
   try {
     const user = await userModel
       .findById(req.params.id)
-      .select("-password")
-      .populate("savedProperties", "title price imgUrls");
+      .select("-password -otp -loginOtp -resetPasswordToken")
+      .populate("savedProperties", "title price imgUrls location");
 
     if (!user) {
       return res.status(404).json({
@@ -240,6 +298,10 @@ const getUserById = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
+    if (req.user._id.toString() !== req.params.id) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
     const updates = { ...req.body };
 
     // Handle password change with verification
@@ -265,12 +327,16 @@ const updateUser = async (req, res) => {
       updates.profileImage = imgUrls[0];
     }
 
+    delete updates.otp;
+    delete updates.loginOtp;
+    delete updates.resetPasswordToken;
+
     const user = await userModel
       .findByIdAndUpdate(req.params.id, updates, {
         new: true,
         runValidators: true,
       })
-      .select("-password");
+      .select("-password -otp -loginOtp -resetPasswordToken");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -292,6 +358,10 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
+    if (req.user._id.toString() !== req.params.id) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
     const user = await userModel.findByIdAndDelete(req.params.id);
 
     if (!user) {
@@ -417,6 +487,7 @@ module.exports = {
   deleteUser,
   switchRole,
   verifyOtp,
+  resendSignupOtp,
   sendEnquiry,
   sendMail,
 };
