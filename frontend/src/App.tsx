@@ -33,7 +33,7 @@ function App() {
             <Route
               path="*"
               element={
-                <main>
+                <main className="chrome-reveal">
                   <Navbar />
                   <div className="w-full flex items-center justify-center grow">
                     <div className="w-full grow">

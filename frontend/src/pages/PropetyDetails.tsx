@@ -9,11 +9,14 @@ import { FaLocationDot, FaHouseChimney, FaCouch, FaStar } from "react-icons/fa6"
 import { IoMdMail } from "react-icons/io";
 import { FaPhoneAlt } from "react-icons/fa";
 import { MdBalcony } from "react-icons/md";
+import { IoChevronBack, IoChevronForward } from "react-icons/io5";
 import Searchbar from "@/components/Searchbar";
 import PropertyCard from "@/components/PropertyCard";
 import { toast } from "react-toastify";
 import Cookies from "js-cookie";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import PropertyDummyImage from "../assets/property-dummy-image.jpeg";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface User {
   id?: string;
@@ -144,6 +147,8 @@ const PropertyDetails = () => {
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [isSchedulingVisit, setIsSchedulingVisit] = useState(false);
   const [mapMode, setMapMode] = useState<"map" | "satellite" | "nearby">("map");
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [formData, setFormData] = useState<EnquiryForm>({
     fullname: "",
     email: "",
@@ -336,6 +341,29 @@ const PropertyDetails = () => {
         ? `https://www.google.com/maps?q=restaurants%20near%20${property.location.latitude},${property.location.longitude}&z=15&output=embed`
         : `https://www.google.com/maps?q=${property.location.latitude},${property.location.longitude}&z=15&output=embed`
       : "";
+  const galleryImages = property.imgUrls?.length
+    ? property.imgUrls
+    : [PropertyDummyImage];
+  const collageImages = galleryImages.slice(0, 5);
+  const leadImage = collageImages[0] || PropertyDummyImage;
+  const supportingImages = collageImages.slice(1, 5);
+
+  const openGallery = (index: number) => {
+    setSelectedImageIndex(index);
+    setIsGalleryOpen(true);
+  };
+
+  const showPrevImage = () => {
+    setSelectedImageIndex((prev) =>
+      prev === 0 ? galleryImages.length - 1 : prev - 1
+    );
+  };
+
+  const showNextImage = () => {
+    setSelectedImageIndex((prev) =>
+      prev === galleryImages.length - 1 ? 0 : prev + 1
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -450,29 +478,68 @@ const PropertyDetails = () => {
   };
 
   return (
-    <div className="mx-auto p-4 md:p-8">
+    <div className="page-reveal mx-auto p-4 md:p-8">
       <div className="max-w-[80rem] mx-auto space-y-10">
         <Searchbar />
 
         <div className="flex flex-col gap-8">
-          <div className="grid md:grid-cols-2 gap-2 h-auto md:h-[32rem]">
-            <img
-              src={property.imgUrls?.[0]}
-              alt={property.title}
-              className="w-full h-full object-cover"
-            />
-            <div className=" hidden md:grid grid-cols-2 gap-2 ">
-              {property.imgUrls?.slice(1).map((img, index) => (
+          <div className="section-reveal space-y-3">
+            <div className="grid md:grid-cols-[1.35fr_1fr] gap-2 h-auto md:h-[28rem] lg:h-[30rem] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => openGallery(0)}
+                className="relative overflow-hidden rounded-md shadow-sm text-left cursor-zoom-in"
+              >
                 <img
-                  key={index}
-                  src={img}
-                  alt={`${property.title} ${index + 1}`}
-                  className="w-full h-full object-cover"
+                  src={leadImage}
+                  alt={property.title}
+                  className="image-zoom w-full h-full object-cover"
                 />
+                <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/35 to-transparent" />
+                <div className="absolute right-4 bottom-4 rounded-full bg-black/50 px-4 py-2 text-xs font-medium tracking-[0.16em] text-white backdrop-blur-sm">
+                  View photos
+                </div>
+              </button>
+              <div className="hidden md:grid grid-cols-2 grid-rows-2 gap-2 min-h-0">
+                {supportingImages.map((img, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => openGallery(index + 1)}
+                    className="relative overflow-hidden rounded-md shadow-sm cursor-zoom-in"
+                  >
+                    <img
+                      src={img}
+                      alt={`${property.title} ${index + 2}`}
+                      className="image-zoom w-full h-full object-cover"
+                    />
+                    {index === 3 && galleryImages.length > 5 ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-white text-lg font-semibold">
+                        +{galleryImages.length - 5}
+                      </div>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-5 gap-2 md:hidden">
+              {collageImages.map((img, index) => (
+                <button
+                  key={`${img}-${index}`}
+                  type="button"
+                  onClick={() => openGallery(index)}
+                  className="h-16 overflow-hidden rounded-md cursor-zoom-in"
+                >
+                  <img
+                    src={img}
+                    alt={`${property.title} mobile ${index + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
               ))}
             </div>
           </div>
-          <div className="grid grid-rows-2 lg:grid-rows-none lg:grid-cols-5 items-start gap-0 lg:gap-10">
+          <div className="section-reveal stagger-1 grid grid-rows-2 lg:grid-rows-none lg:grid-cols-5 items-start gap-0 lg:gap-10">
             <div className="space-y-6 grid col-span-3">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
@@ -1055,7 +1122,7 @@ const PropertyDetails = () => {
               </div>
             </div>
           </div>
-          <div className="w-full space-y-6 mt-10">
+          <div className="section-reveal stagger-2 w-full space-y-6 mt-10">
             <h1 className="text-2xl font-medium">Similar Properties</h1>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
               {similarProperties.map((prop) => (
@@ -1065,6 +1132,61 @@ const PropertyDetails = () => {
           </div>
         </div>
       </div>
+      <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
+        <DialogContent className="max-w-[min(92vw,1100px)] bg-black p-4 text-white border-black sm:p-5">
+          <DialogTitle className="sr-only">{property.title} image gallery</DialogTitle>
+          <div className="space-y-4">
+            <div className="relative overflow-hidden rounded-md bg-black">
+              <img
+                src={galleryImages[selectedImageIndex]}
+                alt={`${property.title} ${selectedImageIndex + 1}`}
+                className="h-[72vh] w-full object-contain"
+              />
+              {galleryImages.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={showPrevImage}
+                    className="button-pop absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white"
+                  >
+                    <IoChevronBack className="h-6 w-6" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showNextImage}
+                    className="button-pop absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white"
+                  >
+                    <IoChevronForward className="h-6 w-6" />
+                  </button>
+                </>
+              ) : null}
+              <div className="absolute bottom-4 left-4 rounded-full bg-black/55 px-4 py-2 text-sm text-white">
+                {selectedImageIndex + 1} / {galleryImages.length}
+              </div>
+            </div>
+            <div className="grid grid-cols-5 gap-3 sm:grid-cols-6 lg:grid-cols-8">
+              {galleryImages.map((img, index) => (
+                <button
+                  key={`${img}-viewer-${index}`}
+                  type="button"
+                  onClick={() => setSelectedImageIndex(index)}
+                  className={`overflow-hidden rounded-md border-2 ${
+                    selectedImageIndex === index
+                      ? "border-white"
+                      : "border-white/15"
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`${property.title} thumbnail ${index + 1}`}
+                    className="h-20 w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

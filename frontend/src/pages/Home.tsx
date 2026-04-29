@@ -57,19 +57,19 @@ const Home = () => {
   }, []);
 
   return (
-    <div className="space-y-20">
-      <div className="relative w-full grow">
+    <div className="page-reveal space-y-20">
+      <div className="relative w-full grow section-reveal">
         <div className="w-full h-[300px] md:h-[400px] z-10 relative">
           <img
             src={House1BG}
             alt="bg-1"
-            className="w-full h-full object-cover object-top"
+            className="image-zoom w-full h-full object-cover object-top"
           />
           <div className="absolute inset-0 h-full justify-center ml-4 md:ml-20 flex flex-col w-[90%] md:w-[600px] z-10">
-            <p className="text-2xl md:text-4xl font-black leading-15 w-5/6">
+            <p className="section-reveal stagger-1 text-2xl md:text-4xl font-black leading-15 w-5/6">
               Searching for a place to live? Find it in RentEase
             </p>
-            <p className="mt-3 text-gray-500">
+            <p className="section-reveal stagger-2 mt-3 text-gray-500">
               Discover a wide range of properties for sale or rent in your
               desired location, filter by price, and more to find your dream
               property.
@@ -77,7 +77,7 @@ const Home = () => {
           </div>
         </div>
 
-        <div className="flex justify-center px-2 md:px-4 -mt-10 md:-mt-8 z-20 relative grow">
+        <div className="section-reveal stagger-3 flex justify-center px-2 md:px-4 -mt-10 md:-mt-8 z-20 relative grow">
           <Searchbar />
         </div>
       </div>
@@ -90,7 +90,7 @@ const Home = () => {
           );
 
           return (
-            <div key={category.key} className="w-full space-y-10">
+            <div key={category.key} className="section-reveal w-full space-y-10">
               <h1 className="text-2xl text-center">{category.title}</h1>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 {properties.length === 0 ? (

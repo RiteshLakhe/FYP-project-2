@@ -87,11 +87,15 @@ const PropertyCard = ({
     }
   };
 
+  const gallery = property.imgUrls?.slice(0, 5) || [];
+  const coverImage = gallery[0] || PropertyDummyImage;
+  const collageImages = gallery.slice(1, 5);
+
   return (
     <div
       onClick={() => (window.location.href = `/property/${property._id}`)}
       className="block group cursor-pointer">
-      <div className="w-full shadow-md rounded-md overflow-hidden bg-white">
+      <div className="card-lift w-full shadow-md rounded-md overflow-hidden bg-white border border-transparent">
         <div className="relative">
           <div className="absolute w-full p-4 flex items-center justify-between z-10">
             <div className="flex items-center gap-2">
@@ -118,12 +122,25 @@ const PropertyCard = ({
               )}
             </button>
           </div>
-          <img
-            src={property.imgUrls?.[0] || PropertyDummyImage}
-            alt={property.title}
-            className="w-full aspect-video object-cover"
-            loading="lazy"
-          />
+          <div className="grid grid-cols-[1.4fr_1fr] aspect-video overflow-hidden">
+            <img
+              src={coverImage}
+              alt={property.title}
+              className="image-zoom h-full w-full object-cover"
+              loading="lazy"
+            />
+            <div className="grid grid-cols-2 grid-rows-2 gap-[2px] bg-gray-100 p-[2px]">
+              {collageImages.map((img, index) => (
+                <img
+                  key={`${property._id}-thumb-${index}`}
+                  src={img}
+                  alt={`${property.title} ${index + 2}`}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          </div>
         </div>
         <div className="p-4 space-y-2">
           <h1 className="text-sm sm:text-base md:text-lg font-semibold truncate group-hover:underline">

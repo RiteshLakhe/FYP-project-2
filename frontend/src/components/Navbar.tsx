@@ -109,7 +109,7 @@ const Navbar = () => {
   };
 
   return (
-    <div className="w-full bg-white py-0 flex items-center justify-center border border-b-gray-200 sticky top-0 z-50">
+    <div className="chrome-reveal page-shell-glow w-full bg-white py-0 flex items-center justify-center border border-b-gray-200 sticky top-0 z-50">
       <div className="w-full px-3 xl:px-10 flex items-center justify-between">
         {!isLandlordRoute ? (
           <img
@@ -138,7 +138,7 @@ const Navbar = () => {
                   return (
                     <li
                       key={index}
-                      className={`hover:text-[#1A623A] cursor-pointer transition-colors text-sm ${
+                      className={`interactive-underline hover:text-[#1A623A] cursor-pointer transition-colors text-sm ${
                         isActive(link.path)
                           ? "text-[#1A623A] font-semibold"
                           : ""
@@ -155,7 +155,7 @@ const Navbar = () => {
           <div className="flex items-center gap-4">
             {hasBothRoles ? (
               <button
-                className="hidden sm:flex items-center px-4 md:px-6 py-2 md:py-2 rounded-sm gap-2 cursor-pointer bg-[#1E293B] text-white"
+                className="button-pop hidden sm:flex items-center px-4 md:px-6 py-2 md:py-2 rounded-sm gap-2 cursor-pointer bg-[#1E293B] text-white"
                 onClick={handleSwitchRole}>
                 <span className="text-sm md:text-base">
                   Switch to{" "}
@@ -165,7 +165,7 @@ const Navbar = () => {
             ) : (
               !isLandlordRoute && (
                 <button
-                  className="hidden sm:flex items-center px-4 md:px-6 py-2 md:py-2 rounded-sm gap-2 cursor-pointer bg-[#1E293B] text-white"
+                  className="button-pop hidden sm:flex items-center px-4 md:px-6 py-2 md:py-2 rounded-sm gap-2 cursor-pointer bg-[#1E293B] text-white"
                   onClick={handlePostPropertyRoute}>
                   <FiPlusCircle />
                   <span className="text-sm md:text-base">
@@ -178,7 +178,7 @@ const Navbar = () => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <div className="flex items-center border rounded-sm gap-2 py-2 px-4 bg-white hover:bg-gray-50 cursor-pointer">
+                  <div className="soft-shimmer flex items-center border rounded-sm gap-2 py-2 px-4 bg-white hover:bg-gray-50 cursor-pointer">
                     <div
                       className="w-10 h-10 rounded-full text-white flex items-center justify-center cursor-pointer"
                       onClick={() => navigate("/dashboard/personal-info")}>
@@ -213,7 +213,7 @@ const Navbar = () => {
             ) : (
               <button
                 onClick={() => navigate("/registration/signin")}
-                className="bg-white hover:bg-gray-50 text-black px-10 py-2 border rounded-sm cursor-pointer text-sm md:text-base">
+                className="button-pop bg-white hover:bg-gray-50 text-black px-10 py-2 border rounded-sm cursor-pointer text-sm md:text-base">
                 Login/Sigup
               </button>
             )}

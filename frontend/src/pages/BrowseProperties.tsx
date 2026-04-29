@@ -119,7 +119,7 @@ const BrowseProperties = () => {
   };
 
   return (
-    <div className="px-4 xl:px-20 py-4 md:py-10">
+    <div className="page-reveal px-4 xl:px-20 py-4 md:py-10">
       {showSidebar && (
         <div className="fixed inset-0 flex z-50">
           <div
@@ -213,7 +213,7 @@ const BrowseProperties = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-10 xl:gap-15">
-        <div className="space-y-10 col-span-3 lg:col-span-1 lg:space-y-6 items-start">
+        <div className="section-reveal space-y-10 col-span-3 lg:col-span-1 lg:space-y-6 items-start">
           <div className="flex  justify-between items-center w-full">
             <h1 className="text-2xl font-bold mb-0 lg:mb-6">
               Browse Properties
@@ -308,7 +308,7 @@ const BrowseProperties = () => {
           </div>
         </div>
 
-        <div className="col-span-3 space-y-10">
+        <div className="section-reveal stagger-1 col-span-3 space-y-10">
           <Searchbar />
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filteredProperties.length > 0 ? (
