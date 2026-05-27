@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import RentEaseLogo from "../assets/RentEase.svg";
 import { FiPlusCircle, FiLogOut } from "react-icons/fi";
+import { FaBookmark } from "react-icons/fa";
 import { CgProfile } from "react-icons/cg";
 import { RxHamburgerMenu, RxCross2 } from "react-icons/rx";
 import { IoIosArrowDown } from "react-icons/io";
@@ -20,6 +21,7 @@ import { useLocation } from "react-router-dom";
 import { Axios } from "@/services/AxiosInstance";
 import { API_ENDPOINTS } from "@/services/Endpoints";
 import Cookies from "js-cookie";
+import { resolveAvatar } from "@/lib/avatar";
 
 interface User {
   _id: string;
@@ -38,7 +40,7 @@ const Navbar = () => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      if (!userId) {
+      if (!userId || user?.currentRole === "admin") {
         setUserData(null);
         return;
       }
@@ -52,7 +54,7 @@ const Navbar = () => {
     };
 
     fetchUser();
-  }, [userId]);
+  }, [userId, user?.currentRole]);
 
   const handleLogout = async () => {
     try {
@@ -183,7 +185,10 @@ const Navbar = () => {
                       className="w-10 h-10 rounded-full text-white flex items-center justify-center cursor-pointer"
                       onClick={() => navigate("/dashboard/personal-info")}>
                       <img
-                        src={userData?.profileImage || user?.profileImage}
+                        src={resolveAvatar(
+                          userData?.fullname || user?.fullname,
+                          userData?.profileImage || user?.profileImage
+                        )}
                         alt="Profile Image"
                         className="w-full h-full object-cover rounded-full"
                       />
@@ -195,17 +200,52 @@ const Navbar = () => {
                     <IoIosArrowDown />
                   </div>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-[200px]">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuContent className="w-[260px] p-2">
+                  <DropdownMenuLabel className="space-y-1 rounded-md bg-[#f8fafc] p-3">
+                    <p className="text-sm font-semibold">
+                      Hi, {userData?.fullname || user?.fullname}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {user?.currentRole === "admin"
+                        ? "Keeping RentEase tidy today."
+                        : user?.currentRole === "landlord"
+                        ? "Your listings are ready when you are."
+                        : "Welcome back to your rental hunt."}
+                    </p>
+                    <span className="inline-flex rounded-full bg-[#38B593]/10 px-2 py-1 text-xs font-medium capitalize text-[#1A623A]">
+                      {user?.currentRole}
+                    </span>
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => navigate("/dashboard")}
+                    onClick={handleProfile}
                     className="flex items-center">
-                    <CgProfile /> Profile
+                    <CgProfile /> Dashboard
                   </DropdownMenuItem>
+                  {user.currentRole !== "admin" ? (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/dashboard/personal-info")}
+                      className="flex items-center">
+                      <CgProfile /> Personal info
+                    </DropdownMenuItem>
+                  ) : null}
+                  {user.currentRole === "tenant" ? (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/dashboard/saved-properties")}
+                      className="flex items-center">
+                      <FaBookmark /> Saved homes
+                    </DropdownMenuItem>
+                  ) : null}
+                  {user.roles?.includes("landlord") ? (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/landlord/landlord-dashboard")}
+                      className="flex items-center">
+                      <FiPlusCircle /> My listings
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuItem
                     onClick={handleLogout}
-                    className="flex items-center">
+                    className="flex items-center text-red-600">
                     <FiLogOut /> Logout
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -214,7 +254,7 @@ const Navbar = () => {
               <button
                 onClick={() => navigate("/registration/signin")}
                 className="button-pop bg-white hover:bg-gray-50 text-black px-10 py-2 border rounded-sm cursor-pointer text-sm md:text-base">
-                Login/Sigup
+                Login/Signup
               </button>
             )}
           </div>
@@ -247,7 +287,10 @@ const Navbar = () => {
                   onClick={handleProfile}>
                   <div className="w-8 h-8 rounded-full text-white flex items-center justify-center cursor-pointer">
                     <img
-                      src={userData?.profileImage || user?.profileImage}
+                      src={resolveAvatar(
+                        userData?.fullname || user?.fullname,
+                        userData?.profileImage || user?.profileImage
+                      )}
                       alt="Profile Image"
                       className="w-full h-full object-cover rounded-full"
                     />

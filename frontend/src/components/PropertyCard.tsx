@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { Axios } from "@/services/AxiosInstance";
 import { API_ENDPOINTS } from "@/services/Endpoints";
 import Cookies from "js-cookie";
+import { useUser } from "@/context/UserContext";
 
 interface Property {
   _id: string;
@@ -31,6 +32,8 @@ const PropertyCard = ({
   onUnsave?: (id: string) => void;
 }) => {
   const [saved, setSaved] = useState(initiallySaved);
+  const { user } = useUser();
+  const canSaveProperties = user?.currentRole !== "admin";
 
   useEffect(() => {
     setSaved(initiallySaved);
@@ -40,7 +43,7 @@ const PropertyCard = ({
     const verifySavedStatus = async () => {
       try {
         const token = Cookies.get("authToken");
-        if (!token) return;
+        if (!token || !canSaveProperties) return;
 
         const res = await Axios.get(API_ENDPOINTS.USER.GET_SAVED_PROPERTY, {
           headers: { Authorization: `Bearer ${token}` },
@@ -56,13 +59,13 @@ const PropertyCard = ({
     };
 
     verifySavedStatus();
-  }, [property._id]);
+  }, [canSaveProperties, property._id]);
 
   const handleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const token = Cookies.get("authToken");
 
-    if (!token) {
+    if (!token || !canSaveProperties) {
       console.error("No token found. User might not be logged in.");
       return;
     }
@@ -112,15 +115,17 @@ const PropertyCard = ({
                 </span>
               )}
             </div>
-            <button
-              onClick={handleSave}
-              className="p-2 rounded-full bg-white shadow cursor-pointer">
-              {saved ? (
-                <FaBookmark className="text-yellow-300" />
-              ) : (
-                <FaRegBookmark />
-              )}
-            </button>
+            {canSaveProperties ? (
+              <button
+                onClick={handleSave}
+                className="p-2 rounded-full bg-white shadow cursor-pointer">
+                {saved ? (
+                  <FaBookmark className="text-yellow-300" />
+                ) : (
+                  <FaRegBookmark />
+                )}
+              </button>
+            ) : null}
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] aspect-video overflow-hidden">
             <img

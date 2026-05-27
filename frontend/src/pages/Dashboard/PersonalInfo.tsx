@@ -21,6 +21,7 @@ import { API_ENDPOINTS } from "@/services/Endpoints";
 import { Axios } from "@/services/AxiosInstance";
 import { toast } from "react-toastify";
 import { useUser } from "@/context/UserContext";
+import { resolveAvatar } from "@/lib/avatar";
 
 interface User {
   _id: string;
@@ -221,7 +222,7 @@ const PersonalInfo = () => {
 
           <div className="flex flex-col items-center justify-center gap-5">
             <img
-              src={user?.profileImage || "/default-avatar.png"}
+              src={resolveAvatar(user?.fullname, user?.profileImage)}
               alt="Profile"
               className="w-40 h-40 object-cover rounded-full border"
             />
@@ -234,7 +235,7 @@ const PersonalInfo = () => {
                 <DialogTitle className="mb-4">Edit Profile Image</DialogTitle>
                 <DialogDescription className="relative group w-40 h-40">
                   <img
-                    src={previewUrl || user?.profileImage || "/default-avatar.png"}
+                    src={previewUrl || resolveAvatar(user?.fullname, user?.profileImage)}
                     alt="Preview"
                     className="w-full h-full object-cover rounded-full border"
                   />

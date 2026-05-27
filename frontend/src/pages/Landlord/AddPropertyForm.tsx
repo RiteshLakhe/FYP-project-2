@@ -8,6 +8,7 @@ import { API_ENDPOINTS } from "@/services/Endpoints";
 import Cookies from "js-cookie";
 import { useUser } from "@/context/UserContext";
 import { toast } from "react-toastify";
+import { AxiosError } from "axios";
 
 export type PropertyFormData = {
   title: string;
@@ -119,9 +120,10 @@ const AddPropertyForm= () => {
       reset();
       navigate("/landlord/landlord-dashboard");
     } catch (error) {
+      const err = error as AxiosError<{ message: string }>;
       console.error("Failed to create property:", error);
       const serverMessage =
-        (error as any)?.response?.data?.message || "Failed to create property";
+        err.response?.data?.message || "Failed to create property";
       toast.error(serverMessage);
     } finally {
       setUploading(false);

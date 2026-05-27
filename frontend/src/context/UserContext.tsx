@@ -22,6 +22,19 @@ interface UserContextType {
   switchRole: (role: "tenant" | "landlord") => Promise<User>;
 }
 
+const normalizeUser = (userData: User): User => {
+  const roles = Array.isArray(userData.roles)
+    ? userData.roles
+    : [userData.roles].filter(Boolean);
+  const defaultRole = roles.includes("tenant") ? "tenant" : roles[0];
+
+  return {
+    ...userData,
+    roles,
+    currentRole: userData.currentRole || (defaultRole as User["currentRole"]),
+  };
+};
+
 const UserContext = createContext<UserContextType>({
   user: null,
   setUser: () => {},
@@ -36,23 +49,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     const storedUser = Cookies.get("user");
     if (storedUser) {
       const parsedUser: User = JSON.parse(storedUser);
-
-      if (!parsedUser.currentRole && parsedUser.roles.includes("tenant")) {
-        parsedUser.currentRole = "tenant";
-      }
-      return parsedUser;
+      return normalizeUser(parsedUser);
     }
     return null;
   });
 
   const setUser = useCallback((userData: User, rememberMe = false) => {
-    const defaultRole = userData.roles.includes("tenant")
-      ? "tenant"
-      : userData.roles[0];
-    const updatedUser = {
-      ...userData,
-      currentRole: userData.currentRole || defaultRole,
-    };
+    const updatedUser = normalizeUser(userData);
 
     const cookieOptions = {
       expires: rememberMe ? 7 : undefined,

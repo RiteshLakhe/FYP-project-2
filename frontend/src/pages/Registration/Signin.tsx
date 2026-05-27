@@ -25,11 +25,7 @@ const Signin = () => {
 
   useEffect(() => {
     if (user) {
-      if (user.currentRole === "admin") {
-        navigate("/admin/dashboard");
-      } else {
-        navigate("/");
-      }
+      navigate(user.currentRole === "admin" ? "/dashboard" : "/");
     }
   }, [user, navigate]);
 
@@ -44,8 +40,8 @@ const Signin = () => {
   const onSubmit = async (data: LoginFormData) => {
     try {
       const response = await Axios.post(API_ENDPOINTS.AUTH.LOGIN, {
-        email: data.email,
-        password: data.password,
+        email: data.email.trim(),
+        password: data.password.trim(),
         rememberMe: data.rememberMe,
       });
 
@@ -104,7 +100,7 @@ const Signin = () => {
 
         setTimeout(() => {
           if (currentRole === "admin") {
-            navigate("/admin/dashboard");
+            navigate("/dashboard");
           } else {
             navigate("/");
           }

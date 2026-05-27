@@ -6,6 +6,7 @@ const { generateToken } = require("../utils/token");
 require("dotenv").config();
 const { sendMail, isEmailConfigured } = require("../utils/emailSender");
 const { buildOtp, getOtpExpiry, buildOtpEmail } = require("../utils/otp");
+const { ensureAvatar } = require("../utils/avatar");
 
 const buildAuthResponse = (account, token, isAdmin = false) => ({
   success: true,
@@ -15,14 +16,24 @@ const buildAuthResponse = (account, token, isAdmin = false) => ({
     id: account._id,
     fullname: account.fullname,
     phoneNumber: isAdmin ? null : account.phoneNumber,
-    profileImage: isAdmin ? "" : account.profileImage,
+    profileImage: ensureAvatar(account.fullname, account.profileImage),
     email: account.email,
-    roles: isAdmin ? "admin" : account.roles,
+    roles: isAdmin ? ["admin"] : account.roles,
     currentRole: isAdmin ? "admin" : account.currentRole,
   },
 });
 
 const sendOtpForLogin = async (account, rememberMe, role, res) => {
+  const allowSpamProtection = process.env.OTP_SPAM_PROTECTION === "true";
+
+  if (allowSpamProtection && account.loginOtpExpires && account.loginOtpExpires > new Date()) {
+    const timeLeft = Math.ceil((account.loginOtpExpires - new Date()) / 1000);
+    return res.status(429).json({
+      success: false,
+      message: `OTP already sent. Please wait ${timeLeft} seconds before requesting a new one.`,
+    });
+  }
+
   const otp = buildOtp();
   const expiresAt = getOtpExpiry();
   const emailContent = buildOtpEmail({
@@ -35,12 +46,17 @@ const sendOtpForLogin = async (account, rememberMe, role, res) => {
   account.loginOtpExpires = expiresAt;
   await account.save();
 
-  await sendMail({
-    from: `"RentEase Security" <${process.env.EMAIL_USER}>`,
-    to: account.email,
-    subject: emailContent.subject,
-    html: emailContent.html,
-  });
+  try {
+    await sendMail({
+      from: `"RentEase Security" <${process.env.EMAIL_USER}>`,
+      to: account.email,
+      subject: emailContent.subject,
+      html: emailContent.html,
+    });
+  } catch (emailError) {
+    console.error("Email send failed:", emailError.message);
+    // Continue with the response even if email fails
+  }
 
   return res.status(200).json({
     success: true,
@@ -51,13 +67,21 @@ const sendOtpForLogin = async (account, rememberMe, role, res) => {
     email: account.email,
     role,
     rememberMe: Boolean(rememberMe),
+    user: {
+      email: account.email,
+      currentRole: role,
+      roles: role === "admin" ? ["admin"] : account.roles,
+    },
     devOtp: isEmailConfigured ? undefined : otp,
   });
 };
 
 const logIn = async (req, res) => {
   try {
-    const { email, password, rememberMe } = req.body;
+    let { email, password, rememberMe } = req.body;
+
+    email = email?.toString().trim().toLowerCase();
+    password = password?.toString().trim();
 
     if (!email || !password) {
       return res.status(400).json({
@@ -111,7 +135,8 @@ const logIn = async (req, res) => {
 
 const verifyLoginOtp = async (req, res) => {
   try {
-    const { email, otp, rememberMe } = req.body;
+    let { email, otp, rememberMe } = req.body;
+    email = email?.toString().trim().toLowerCase();
 
     if (!email || !otp) {
       return res.status(400).json({
@@ -195,7 +220,8 @@ const verifyLoginOtp = async (req, res) => {
 
 const resendLoginOtp = async (req, res) => {
   try {
-    const { email } = req.body;
+    let { email, rememberMe } = req.body;
+    email = email?.toString().trim().toLowerCase();
 
     if (!email) {
       return res.status(400).json({ success: false, message: "Email is required" });
@@ -203,7 +229,7 @@ const resendLoginOtp = async (req, res) => {
 
     const admin = await adminModel.findOne({ email });
     if (admin) {
-      return sendOtpForLogin(admin, false, "admin", res);
+      return sendOtpForLogin(admin, rememberMe, "admin", res);
     }
 
     const user = await userModel.findOne({ email });
@@ -218,7 +244,7 @@ const resendLoginOtp = async (req, res) => {
       });
     }
 
-    return sendOtpForLogin(user, false, "user", res);
+    return sendOtpForLogin(user, rememberMe, "user", res);
   } catch (error) {
     console.error("Resend login OTP error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
@@ -227,24 +253,32 @@ const resendLoginOtp = async (req, res) => {
 
 
 const forgotPassword = async (req, res) => {
-  const { email } = req.body;
+  const email = req.body.email?.toString().trim().toLowerCase();
   try {
-    const user = await userModel.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "User not found with that email" });
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const account =
+      (await userModel.findOne({ email })) ||
+      (await adminModel.findOne({ email }));
+
+    if (!account) {
+      return res.status(404).json({ message: "Account not found with that email" });
     }
 
     const token = crypto.randomBytes(32).toString("hex");
 
-    user.resetPasswordToken = token;
-    user.resetPasswordExpires = Date.now() + 3600000;
-    await user.save();
+    account.resetPasswordToken = token;
+    account.resetPasswordExpires = Date.now() + 3600000;
+    await account.save();
 
-    const resetLink = `${process.env.CLIENT_URL}/registration/reset-password/${token}`;
+    const clientUrl = process.env.CLIENT_URL || "http://127.0.0.1:5173";
+    const resetLink = `${clientUrl}/registration/reset-password/${token}`;
 
     await sendMail({
       from: `"RentEase Support" <${process.env.EMAIL_USER}>`,
-      to: user.email,
+      to: account.email,
       subject: "Password Reset - RentEase",
       html: `
         <p>You requested to reset your RentEase password.</p>
@@ -273,22 +307,27 @@ const resetPassword = async (req, res) => {
   const { password } = req.body;
 
   try {
-    const user = await userModel.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() },
-    });
+    const account =
+      (await userModel.findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: { $gt: Date.now() },
+      })) ||
+      (await adminModel.findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: { $gt: Date.now() },
+      }));
 
-    if (!user) {
+    if (!account) {
       return res.status(400).json({ message: "Invalid or expired token" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    user.password = hashedPassword;
+    account.password = hashedPassword;
 
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
+    account.resetPasswordToken = undefined;
+    account.resetPasswordExpires = undefined;
 
-    await user.save();
+    await account.save();
 
     res.status(200).json({ message: "Password updated successfully. Please sign in." });
   } catch (err) {

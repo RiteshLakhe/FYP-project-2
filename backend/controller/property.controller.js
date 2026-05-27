@@ -6,6 +6,7 @@ const multer = require("multer");
 const userModel = require("../model/user.model");
 const mongoose = require("mongoose");
 const { saveLocalFiles } = require("../utils/localUploads");
+const { hasRole } = require("../middleware/auth.middleware");
 
 const parser = new DatauriParser();
 
@@ -224,15 +225,26 @@ const createProperty = async (req, res) => {
 const getAllProperties = async (req, res) => {
   try {
     const { status, includeInactive } = req.query;
+    const isAdmin = hasRole(req.user, "admin");
     const query = {};
 
     if (status) {
+      if (status !== "Active" && !isAdmin) {
+        return res
+          .status(403)
+          .json({ success: false, message: "Admin access required" });
+      }
+
       if (!validStatuses.includes(status)) {
         return res
           .status(400)
           .json({ success: false, message: "Invalid status filter" });
       }
       query.status = status;
+    } else if (includeInactive === "true" && !isAdmin) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Admin access required" });
     } else if (includeInactive !== "true") {
       query.status = "Active";
     }
@@ -331,7 +343,10 @@ const updateProperty = async (req, res) => {
       });
     }
 
-    if (existingProperty.userId.toString() !== req.user._id.toString()) {
+    if (
+      existingProperty.userId.toString() !== req.user._id.toString() &&
+      !hasRole(req.user, "admin")
+    ) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
 
@@ -394,9 +409,15 @@ const updateProperty = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
+    const isValidationError = error?.name === "ValidationError";
+    res.status(isValidationError ? 400 : 500).json({
       success: false,
-      message: "Failed to update property",
+      message: error.message || "Failed to update property",
+      errors: isValidationError
+        ? Object.fromEntries(
+            Object.entries(error.errors).map(([key, value]) => [key, value.message])
+          )
+        : undefined,
     });
   }
 };
@@ -420,7 +441,10 @@ const updatePropertyStatus = async (req, res) => {
         .json({ success: false, message: "Property not found" });
     }
 
-    if (property.userId.toString() !== req.user._id.toString()) {
+    if (
+      property.userId.toString() !== req.user._id.toString() &&
+      !hasRole(req.user, "admin")
+    ) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
 
@@ -448,7 +472,10 @@ const deleteProperty = async (req, res) => {
       });
     }
 
-    if (property.userId.toString() !== req.user._id.toString()) {
+    if (
+      property.userId.toString() !== req.user._id.toString() &&
+      !hasRole(req.user, "admin")
+    ) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
 

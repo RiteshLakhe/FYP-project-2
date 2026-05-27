@@ -13,9 +13,11 @@ interface AuthEndpoints {
 interface UserEndpoints {
   PROFILE: string;
   SWITCH_ROLE: string;
+  GET_ALL_USERS: string;
   GET_USER_BY_ID: (id: string) => string;
   UPDATE_USER: (id: string) => string;
-  SAVE_PROPERTY: string,
+  DELETE_USER: (id: string) => string;
+  SAVE_PROPERTY: string;
   GET_SAVED_PROPERTY: string;
   UNSAVE_PROPERTY: (propertyId: string) => string;
   SEND_ENQUIRY: string;
@@ -55,8 +57,10 @@ export const API_ENDPOINTS: {
   USER: {
     PROFILE: "/user/profile",
     SWITCH_ROLE: "/user/switch-role",
+    GET_ALL_USERS: "/user/getAllUsers",
     GET_USER_BY_ID: (id) => `/user/getUserById/${id}`,
     UPDATE_USER: (id) => `/user/updateUser/${id}`,
+    DELETE_USER: (id) => `/user/deleteUser/${id}`,
     SAVE_PROPERTY: "/user/save-properties",
     UNSAVE_PROPERTY: (propertyId) => `/user/unsave-property/${propertyId}`,
     GET_SAVED_PROPERTY: "/user/get-saved-properties",

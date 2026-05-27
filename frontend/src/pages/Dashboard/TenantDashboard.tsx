@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import { Axios } from "@/services/AxiosInstance";
 import { API_ENDPOINTS } from "@/services/Endpoints";
+import { resolveAvatar } from "@/lib/avatar";
 import { ShieldHalf, IdCard } from "lucide-react";
 import { Bookmark } from "lucide-react";
 import { Link } from "react-router";
@@ -52,7 +53,7 @@ export default function TenantDashboard() {
     <div className="flex items-center justify-center w-full">
       <div className="flex flex-col items-center justify-center w-5xl py-20">
         <div className="bg-white flex flex-col items-center justify-center py-6 px-16 shadow-[0px_6px_16px_rgba(0,0,0,0.1)] rounded-3xl gap-3 mb-20">
-          <img src={user?.profileImage} alt="profile" className="w-28 h-28 rounded-full object-cover" />
+          <img src={resolveAvatar(user?.fullname, user?.profileImage)} alt="profile" className="w-28 h-28 rounded-full object-cover" />
           <div className="text-center space-y-5">
             <div className="space-y-2">
               <p className="text-2xl font-bold">{user?.fullname}</p>

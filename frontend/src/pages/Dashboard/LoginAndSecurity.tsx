@@ -20,6 +20,7 @@ import Cookies from "js-cookie";
 import { toast } from "react-toastify";
 import { API_ENDPOINTS } from "@/services/Endpoints";
 import { Axios } from "@/services/AxiosInstance";
+import { AxiosError } from "axios";
 
 const LoginAndSecurity = () => {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -56,9 +57,10 @@ const LoginAndSecurity = () => {
           setConfirmPassword("");
         },
       });
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as AxiosError<{ message: string }>;
       console.error("Password update failed:", error);
-      toast.error(error?.response?.data?.message || "Failed to update password");
+      toast.error(err.response?.data?.message || "Failed to update password");
     } finally {
       setIsSubmitting(false);
     }

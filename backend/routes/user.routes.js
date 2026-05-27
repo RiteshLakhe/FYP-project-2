@@ -15,12 +15,12 @@ const {
   sendMail,
   upload
 } = require("../controller/user.controller");
-const { protect } = require("../middleware/auth.middleware");
+const { protect, requireAdmin } = require("../middleware/auth.middleware");
 const router = express.Router();
 
 router.post("/registerUser", upload.single("profileImage"), createUser);
-router.get("/getAllUsers", getAllUsers);
-router.get("/getUserById/:id", getUserById);
+router.get("/getAllUsers", protect, requireAdmin, getAllUsers);
+router.get("/getUserById/:id", protect, getUserById);
 router.put("/updateUser/:id", protect, upload.single('profileImage'), updateUser);
 router.delete("/deleteUser/:id", protect, deleteUser);
 router.post("/switch-role", protect, switchRole);

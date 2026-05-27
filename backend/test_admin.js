@@ -7,7 +7,7 @@ const adminModel = require('./model/admin.model');
 async function test() {
   try {
     await mongoose.connect(process.env.MONGO_URL);
-    const admin = await adminModel.findOne({ email: 'admin@rentease.com' });
+    const admin = await adminModel.findOne({ email: process.env.ADMIN_EMAIL });
     if (admin) {
       console.log('Admin exists');
       const valid = await bcrypt.compare('Admin@123456', admin.password);

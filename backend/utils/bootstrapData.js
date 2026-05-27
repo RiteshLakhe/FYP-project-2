@@ -3,6 +3,7 @@ const adminModel = require("../model/admin.model");
 const userModel = require("../model/user.model");
 const propertyModel = require("../model/property.model");
 const propertyData = require("../propertyData.json");
+const { ensureAvatar } = require("./avatar");
 
 const fallbackProperty = {
   title: "Riverside Family Apartment in Kapan",
@@ -84,6 +85,11 @@ const ensureAdmin = async () => {
 
   const existingAdmin = await adminModel.findOne({ email });
   if (existingAdmin) {
+    const nextProfileImage = ensureAvatar(fullname, existingAdmin.profileImage);
+    if (existingAdmin.profileImage !== nextProfileImage) {
+      existingAdmin.profileImage = nextProfileImage;
+      await existingAdmin.save();
+    }
     return existingAdmin;
   }
 
@@ -92,6 +98,7 @@ const ensureAdmin = async () => {
     fullname,
     email,
     password: hashedPassword,
+    profileImage: ensureAvatar(fullname),
   });
 };
 
@@ -103,6 +110,11 @@ const ensureDemoLandlord = async () => {
 
   let user = await userModel.findOne({ email });
   if (user) {
+    const nextProfileImage = ensureAvatar(fullname, user.profileImage);
+    if (user.profileImage !== nextProfileImage) {
+      user.profileImage = nextProfileImage;
+      await user.save();
+    }
     return user;
   }
 
@@ -113,7 +125,7 @@ const ensureDemoLandlord = async () => {
     email,
     password: hashedPassword,
     isVerified: true,
-    profileImage: `https://avatar.iran.liara.run/username?username=${encodeURIComponent(fullname)}`,
+    profileImage: ensureAvatar(fullname),
     roles: ["tenant", "landlord"],
     currentRole: "landlord",
   });
@@ -137,8 +149,26 @@ const ensureSeedProperties = async (ownerId) => {
   return normalized.length;
 };
 
+const ensureUserAvatars = async () => {
+  const usersWithoutAvatar = await userModel.find({
+    $or: [{ profileImage: { $exists: false } }, { profileImage: "" }],
+  });
+
+  if (!usersWithoutAvatar.length) {
+    return;
+  }
+
+  await Promise.all(
+    usersWithoutAvatar.map(async (user) => {
+      user.profileImage = ensureAvatar(user.fullname, user.profileImage);
+      await user.save();
+    })
+  );
+};
+
 const bootstrapData = async () => {
   const [admin, landlord] = await Promise.all([ensureAdmin(), ensureDemoLandlord()]);
+  await ensureUserAvatars();
   const propertyCount = landlord ? await ensureSeedProperties(landlord._id) : 0;
 
   return {

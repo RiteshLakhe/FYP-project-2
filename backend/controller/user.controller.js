@@ -8,6 +8,8 @@ const path = require("path");
 const { cloudinary, isCloudinaryConfigured } = require("../utils/cloudinary");
 const { saveLocalFiles } = require("../utils/localUploads");
 const { buildOtp, getOtpExpiry, buildOtpEmail } = require("../utils/otp");
+const { hasRole } = require("../middleware/auth.middleware");
+const { ensureAvatar } = require("../utils/avatar");
 require("dotenv").config();
 
 const parser = new DatauriParser();
@@ -67,7 +69,7 @@ const sanitizeUser = (user) => ({
   id: user._id,
   fullname: user.fullname,
   phoneNumber: user.phoneNumber,
-  profileImage: user.profileImage,
+  profileImage: ensureAvatar(user.fullname, user.profileImage),
   email: user.email,
   roles: user.roles,
   currentRole: user.currentRole,
@@ -87,9 +89,7 @@ const createUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const uploadedProfileImage = req.file ? (await uploadImages([req.file]))[0] : null;
-    const profileImage =
-      uploadedProfileImage ||
-      `https://avatar.iran.liara.run/username?username=${encodeURIComponent(fullname)}`;
+    const profileImage = ensureAvatar(fullname, uploadedProfileImage);
 
     const user = existingUser || new userModel({ email });
     user.fullname = fullname;
@@ -203,6 +203,10 @@ const resendSignupOtp = async (req, res) => {
 };
 
 const saveProperty = async (req, res) => {
+  if (hasRole(req.user, "admin")) {
+    return res.status(403).json({ message: "Admins cannot save properties" });
+  }
+
   const { propertyId } = req.body;
   try {
     const user = await userModel.findById(req.user.id);
@@ -218,6 +222,10 @@ const saveProperty = async (req, res) => {
 };
 
 const unsaveProperty = async (req, res) => {
+  if (hasRole(req.user, "admin")) {
+    return res.status(403).json({ message: "Admins do not have saved properties" });
+  }
+
   const userId = req.user.id;
   const { propertyId } = req.params;
 
@@ -244,9 +252,17 @@ const unsaveProperty = async (req, res) => {
 
 const getSavedProperties = async (req, res) => {
   try {
+    if (hasRole(req.user, "admin")) {
+      return res.status(200).json({ properties: [] });
+    }
+
     const user = await userModel.findById(req.user.id).populate("savedProperties");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
     res.status(200).json({ properties: user.savedProperties });
   } catch (error) {
+    console.error("Get saved properties error:", error);
     res.status(500).json({ message: "Failed to get saved properties", error });
   }
 };
@@ -271,6 +287,10 @@ const getAllUsers = async (req, res) => {
 
 const getUserById = async (req, res) => {
   try {
+    if (!hasRole(req.user, "admin") && req.user._id.toString() !== req.params.id) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
     const user = await userModel
       .findById(req.params.id)
       .select("-password -otp -loginOtp -resetPasswordToken")
@@ -298,7 +318,7 @@ const getUserById = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    if (req.user._id.toString() !== req.params.id) {
+    if (!hasRole(req.user, "admin") && req.user._id.toString() !== req.params.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
 
@@ -358,7 +378,7 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
-    if (req.user._id.toString() !== req.params.id) {
+    if (!hasRole(req.user, "admin") && req.user._id.toString() !== req.params.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
 

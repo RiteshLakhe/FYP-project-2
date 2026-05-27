@@ -18,8 +18,15 @@ const adminModel = mongoose.Schema(
       required: [true, "Password is required"],
     },
 
+    profileImage: {
+      type: String,
+      default: "",
+    },
+
     loginOtp: String,
     loginOtpExpires: Date,
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
 
     roles: {
       type: String,

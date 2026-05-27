@@ -1,6 +1,7 @@
 const adminModel = require("../model/admin.model");
 require("dotenv").config();
 const bcrypt = require("bcrypt");
+const { ensureAvatar } = require("../utils/avatar");
 
 const registerAdmin = async (req, res) => {
   try {
@@ -22,6 +23,7 @@ const registerAdmin = async (req, res) => {
       fullname,
       email,
       password: hashedPassword,
+      profileImage: ensureAvatar(fullname),
     });
 
     res.status(200).json({
@@ -31,6 +33,7 @@ const registerAdmin = async (req, res) => {
         id: admin._id,
         fullname: admin.fullname,
         email: admin.email,
+        profileImage: ensureAvatar(admin.fullname, admin.profileImage),
         roles: admin.roles,
       },
     });
@@ -58,6 +61,7 @@ const getAdmin = async (req, res) => {
         id: admin._id,
         fullname: admin.fullname,
         email: admin.email,
+        profileImage: ensureAvatar(admin.fullname, admin.profileImage),
         roles: admin.roles,
       },
     });

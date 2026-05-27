@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import Signup from "./pages/Registration/Signup";
 import Signin from "./pages/Registration/Signin";
 import Home from "./pages/Home";
@@ -12,7 +12,7 @@ import Footer from "./components/Footer";
 import BrowseProperties from "./pages/BrowseProperties";
 import ContactUs from "./pages/ContactUs";
 import LandlordDashboard from "./pages/Landlord/LandlordDashboard";
-import TenantDashboard from "./pages/Dashboard/TenantDashboard";
+import RoleBasedDashboard from "./pages/Dashboard/RoleBasedDashboard";
 import PropertyDetails from "./pages/PropetyDetails";
 import EditProperty from "./pages/Landlord/EditProperty";
 import AddPropertyForm from "./pages/Landlord/AddPropertyForm";
@@ -45,7 +45,7 @@ function App() {
                         <Route path="/property/:id" element={<PropertyDetails />} />  
                         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />  
                         
-                        <Route path="/dashboard" element={<TenantDashboard />} />  
+                        <Route path="/dashboard" element={<RoleBasedDashboard />} />  
                         <Route path="/dashboard/personal-info" element={<PersonalInfo />} />  
                         <Route path="/dashboard/login-and-security" element={<LoginAndSecurity />} />  
                         <Route path="/dashboard/saved-properties" element={<SavedProperties />} />  
@@ -54,6 +54,7 @@ function App() {
                         <Route path="/landlord/landlord-dashboard" element={<LandlordDashboard />} />
                         <Route path="/landlord/addPropertyForm" element={<AddPropertyForm/>} />
                         <Route path="/landlord/editPropertyForm/:id" element={<EditProperty />} />
+                        <Route path="/admin/dashboard" element={<Navigate to="/dashboard" replace />} />
 
                         <Route path="*" element={<NotFound />} />
                       </Routes>

@@ -14,9 +14,11 @@ import Searchbar from "@/components/Searchbar";
 import PropertyCard from "@/components/PropertyCard";
 import { toast } from "react-toastify";
 import Cookies from "js-cookie";
+import { AxiosError } from "axios";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import PropertyDummyImage from "../assets/property-dummy-image.jpeg";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { resolveAvatar } from "@/lib/avatar";
 
 interface User {
   id?: string;
@@ -414,8 +416,9 @@ const PropertyDetails = () => {
       );
       setReviewForm({ rating: 5, comment: "" });
       toast.success(response.data.message || "Review saved");
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to save review");
+    } catch (error) {
+      const err = error as AxiosError<{ message: string }>;
+      toast.error(err.response?.data?.message || "Failed to save review");
     } finally {
       setIsSubmittingReview(false);
     }
@@ -446,8 +449,9 @@ const PropertyDetails = () => {
       );
       setVisitForm((prev) => ({ ...prev, scheduledFor: "", note: "" }));
       toast.success(response.data.message || "Visit scheduled");
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to schedule visit");
+    } catch (error) {
+      const err = error as AxiosError<{ message: string }>;
+      toast.error(err.response?.data?.message || "Failed to schedule visit");
     } finally {
       setIsSchedulingVisit(false);
     }
@@ -472,8 +476,9 @@ const PropertyDetails = () => {
           : prev
       );
       toast.success(response.data.message || "Visit updated");
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to update visit");
+    } catch (error) {
+      const err = error as AxiosError<{ message: string }>;
+      toast.error(err.response?.data?.message || "Failed to update visit");
     }
   };
 
@@ -644,7 +649,7 @@ const PropertyDetails = () => {
                     <div className="border-r border-gray-200 p-4 space-y-4 bg-[#f8fafc]">
                       <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
-                          Zillow-style map panel
+                          Location
                         </p>
                         <h1 className="text-xl font-semibold mt-2">Explore the area</h1>
                         <p className="text-sm text-gray-600 mt-1">
@@ -909,7 +914,7 @@ const PropertyDetails = () => {
               <div className="w-full bg-white rounded-sm drop-shadow-sm h-auto space-y-0">
                 <div className="flex gap-4 h-auto px-6 py-8">
                   <img
-                    src={ownerProfileImg || ""}
+                    src={resolveAvatar(ownerName, ownerProfileImg)}
                     alt="Owner Profile"
                     className="w-20 h-20 rounded-full"
                   />

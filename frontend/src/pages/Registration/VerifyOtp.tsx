@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 import Cookies from "js-cookie";
 import { useUser } from "@/context/UserContext";
 import { useEffect } from "react";
+import { AxiosError } from "axios";
 
 const isSecureContext = window.location.protocol === "https:";
 
@@ -43,7 +44,7 @@ const VerifyOtp: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      navigate(user.currentRole === "admin" ? "/admin/dashboard" : "/");
+      navigate(user.currentRole === "admin" ? "/dashboard" : "/");
     }
   }, [user, navigate]);
 
@@ -76,6 +77,7 @@ const VerifyOtp: React.FC = () => {
       }
 
       const cookieOptions = {
+        expires: rememberMe ? 7 : undefined,
         secure: isSecureContext,
         sameSite: "Lax" as const,
       };
@@ -100,14 +102,15 @@ const VerifyOtp: React.FC = () => {
         autoClose: 2000,
       });
 
-      navigate(userData.currentRole === "admin" ? "/admin/dashboard" : "/");
+      navigate(userData.currentRole === "admin" ? "/dashboard" : "/");
 
       
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as AxiosError<{ message: string }>;
       console.error("Verification error:", error);
       const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
+        err.response?.data?.message ||
+        err.message ||
         "Verification failed. Please try again.";
         
       toast.error(errorMessage, {
@@ -197,12 +200,13 @@ const VerifyOtp: React.FC = () => {
                 mode === "login"
                   ? API_ENDPOINTS.AUTH.RESEND_LOGIN_OTP
                   : API_ENDPOINTS.AUTH.RESEND_SIGNUP_OTP,
-                { email: emailFromQuery }
+                { email: emailFromQuery, rememberMe }
               );
               toast.success("A new OTP has been sent.");
-            } catch (error: any) {
+            } catch (error) {
+              const err = error as AxiosError<{ message: string }>;
               toast.error(
-                error.response?.data?.message || "Failed to resend OTP."
+                err.response?.data?.message || "Failed to resend OTP."
               );
             }
           }}
