@@ -1,85 +1,110 @@
 import Logo from "../assets/RentEase.svg";
 import { navLinks, footerLinks, followUsLinks } from "@/data/Navlinks";
 import { Link } from "react-router-dom";
+import { FiMail, FiPhone, FiMapPin } from "react-icons/fi";
 
 const Footer = () => {
   return (
-    <div className="w-full bg-white py-0 flex items-center justify-center drop-shadow-sm bottom-0 z-50 mt-20">
-      <div className="px-4 lg:px-6 w-full xl:px-8 2xl:px-10 flex flex-col items-center justify-between">
-        <div className="w-full flex flex-col lg:flex-row items-start justify-between gap-0 lg:gap-26 xl:gap-36 2xl:gap-96">
-          <div className="md:text-left">
-            <img src={Logo} alt="Logo" className="w-56" />
-            <p>
-              RentEase is a smart rental platform designed to simplify the
-              process of finding and listing apartments, rooms, and commercial
-              spaces. Whether you're a tenant or a landlord, manage everything
-              in one place with ease.
-            </p>
-          </div>
-          <div className="flex flex-col md:flex-row w-full items-start gap-12 xl:gap-32 justify-between py-10">
-            <ul>
-              <li className="pb-6">
-                <p className="font-semibold ">Links</p>
-              </li>
-              {navLinks.map((link, index) => (
-                <li key={index} className="pb-2">
-                  <Link to={link.path}>{link.text}</Link>
-                </li>
-              ))}{" "}
-            </ul>
+    <footer className="mt-28 bg-neutral-950 text-neutral-300 relative overflow-hidden">
+      {/* cyan signature glow */}
+      <div className="absolute -top-32 right-1/4 h-64 w-64 rounded-full bg-cyan-500/20 blur-[120px]" />
+      <div className="absolute -bottom-32 left-1/4 h-64 w-64 rounded-full bg-cyan-400/10 blur-[120px]" />
 
-            <ul>
-              <li className="pb-6">
-                <p className="font-semibold">Rent</p>
-              </li>
-              {footerLinks.map((link, index) => (
-                <li key={index} className="pb-2">
-                  <Link onClick={() => window.location.href = `${link.path}`} to={link.path}>{link.text}</Link>
+      <div className="relative mx-auto max-w-[1440px] px-4 lg:px-8 py-20">
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-12">
+          <div className="md:col-span-5">
+            <img src={Logo} alt="RentEase" className="h-10 mb-6 brightness-0 invert" />
+            <p className="text-sm text-neutral-400 leading-relaxed max-w-md">
+              RentEase is a sleek, verified real-estate platform that simplifies
+              the way you search, list, and manage rooms, apartments, and
+              commercial spaces.
+            </p>
+
+            <div className="mt-8 space-y-3 text-sm">
+              <p className="flex items-center gap-3">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-400/10 text-cyan-400"><FiPhone size={14} /></span>
+                <span className="text-neutral-300">+977 9824155217</span>
+              </p>
+              <p className="flex items-center gap-3">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-400/10 text-cyan-400"><FiMail size={14} /></span>
+                <span className="text-neutral-300">hello@rentease.com</span>
+              </p>
+              <p className="flex items-center gap-3">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-400/10 text-cyan-400"><FiMapPin size={14} /></span>
+                <span className="text-neutral-300">Naxal, Kathmandu</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <h4 className="eyebrow-light mb-5">Explore</h4>
+            <ul className="space-y-3">
+              {navLinks.map((link, index) => (
+                <li key={index}>
+                  <Link to={link.path} className="text-sm text-neutral-400 hover:text-cyan-400 transition">
+                    {link.text}
+                  </Link>
                 </li>
               ))}
             </ul>
+          </div>
 
-            <ul>
-              <li className="pb-6">
-                <p className="font-semibold">Contact Us</p>
-              </li>
-              <li className="pb-2">
-                <p>+977 9824155217</p>
-              </li>
-              <li className="pb-2">
-                <p>user@gmail.com</p>
-              </li>
-              <li className="pb-2">
-                <p>Naxal, Kathmandu</p>
-              </li>
+          <div className="md:col-span-2">
+            <h4 className="eyebrow-light mb-5">Rent</h4>
+            <ul className="space-y-3">
+              {footerLinks.map((link, index) => (
+                <li key={index}>
+                  <Link
+                    onClick={() => (window.location.href = `${link.path}`)}
+                    to={link.path}
+                    className="text-sm text-neutral-400 hover:text-cyan-400 transition">
+                    {link.text}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
-        </div>
 
-        <hr className="w-full" />
-        <div className="mt-5 mb-10 flex flex-col md:flex-row w-full gap-5 md:gap-0 md:items-center justify-between">
-          <p>© 2026 Rent Ease . All Right Reserved</p>
-          <div className="space-y-2">
-            <p>Follow us on</p>
-            <div className="w-full flex flex-row md:justify-between gap-8">
+          <div className="md:col-span-3">
+            <h4 className="eyebrow-light mb-5">Stay Connected</h4>
+            <p className="text-sm text-neutral-400 mb-5">
+              Follow us for new listings, market insights, and rental tips.
+            </p>
+            <div className="flex items-center gap-3">
               {followUsLinks.map((link, index) => {
                 const Icon = link.icon;
-
                 return (
                   <a
                     key={index}
-                    href={link.path}
+                    href={link.path || "#"}
                     target="_blank"
-                    rel="noopener noreferrer">
-                    <Icon size={20} />
+                    rel="noopener noreferrer"
+                    className="grid h-10 w-10 place-items-center rounded-xl border border-neutral-800 text-neutral-400 hover:border-cyan-400 hover:text-cyan-400 hover:bg-cyan-400/5 transition">
+                    <Icon size={16} />
                   </a>
                 );
               })}
             </div>
           </div>
         </div>
+
+        <hr className="my-12 divider-cyan border-0" />
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <p className="text-xs text-neutral-500">
+            © 2026 RentEase. Crafted with precision.
+          </p>
+          <div className="flex items-center gap-6 text-xs text-neutral-500">
+            <Link to="/terms-and-conditions" className="hover:text-cyan-400 transition">
+              Terms & Conditions
+            </Link>
+            <Link to="/contact-us" className="hover:text-cyan-400 transition">
+              Contact
+            </Link>
+          </div>
+        </div>
       </div>
-    </div>
+    </footer>
   );
 };
 

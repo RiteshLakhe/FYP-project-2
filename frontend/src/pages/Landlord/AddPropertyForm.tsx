@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RxCross2 } from "react-icons/rx";
 import { LuUpload } from "react-icons/lu";
 import { useNavigate } from "react-router";
@@ -9,6 +9,8 @@ import Cookies from "js-cookie";
 import { useUser } from "@/context/UserContext";
 import { toast } from "react-toastify";
 import { AxiosError } from "axios";
+import LocationMapPicker from "@/components/LocationMapPicker";
+import TagInput from "@/components/TagInput";
 
 export type PropertyFormData = {
   title: string;
@@ -51,6 +53,8 @@ export type PropertyFormData = {
   price: number;
   priceInWords: string;
   negotiable: "Yes" | "No";
+  landmark?: string;
+  tags?: string[];
 };
 
 const AddPropertyForm= () => {
@@ -65,7 +69,16 @@ const AddPropertyForm= () => {
     reset,
   } = useForm<PropertyFormData>();
   const [uploading, setUploading] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [landmark, setLandmark] = useState<string>("");
   const navigate = useNavigate();
+
+  // Register hidden lat/lng/mapLabel so the form validates
+  useEffect(() => {
+    register("latitude", { required: "Pin a location on the map", valueAsNumber: true });
+    register("longitude", { required: "Pin a location on the map", valueAsNumber: true });
+    register("mapLabel", { required: "Please describe the area or click the map" });
+  }, [register]);
 
   const category = watch("category");
   const isNegotiable = watch("negotiable");
@@ -86,8 +99,11 @@ const AddPropertyForm= () => {
     formData.append("userId", userId!);
 
     Object.entries(data).forEach(([key, value]) => {
+      if (key === "tags" || key === "landmark") return;
       formData.append(key, value as string);
     });
+    formData.append("landmark", landmark);
+    formData.append("tags", JSON.stringify(tags));
 
     images.forEach((file) => {
       formData.append("images", file);
@@ -279,71 +295,53 @@ const AddPropertyForm= () => {
                   </p>
                 )}
               </div>
-              <div>
-                <label htmlFor="mapLabel">Map Label</label>
-                <input
-                  type="text"
-                  className="w-full border p-3 rounded-xs text-gray-700 border-gray-300"
-                  placeholder="e.g. Jawalakhel, Lalitpur"
-                  {...register("mapLabel", { required: "Map label is required" })}
+              <div className="sm:col-span-2 md:col-span-3 space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <label className="text-sm font-bold text-neutral-900">Pin the property location on the map</label>
+                    <p className="text-xs text-neutral-500 mt-0.5">Click the map to drop a pin, or drag it like in Uber. We save the exact coordinates automatically.</p>
+                  </div>
+                  {(errors.latitude || errors.longitude || errors.mapLabel) && (
+                    <span className="text-red-600 text-xs font-semibold">Please pin a location.</span>
+                  )}
+                </div>
+                <LocationMapPicker
+                  value={
+                    latitude && longitude
+                      ? { lat: Number(latitude), lng: Number(longitude) }
+                      : null
+                  }
+                  onChange={({ lat, lng }) => {
+                    setValue("latitude", lat, { shouldValidate: true });
+                    setValue("longitude", lng, { shouldValidate: true });
+                    if (!watch("mapLabel")) {
+                      setValue("mapLabel", `${lat.toFixed(4)}, ${lng.toFixed(4)}`, { shouldValidate: true });
+                    }
+                  }}
+                  landmark={landmark}
+                  onLandmarkChange={setLandmark}
                 />
-                {errors.mapLabel && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.mapLabel.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="latitude">Latitude</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="w-full border p-3 rounded-xs text-gray-700 border-gray-300"
-                  placeholder="e.g. 27.7172"
-                  {...register("latitude", {
-                    required: "Latitude is required",
-                    valueAsNumber: true,
-                  })}
-                />
-                {errors.latitude && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.latitude.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="longitude">Longitude</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="w-full border p-3 rounded-xs text-gray-700 border-gray-300"
-                  placeholder="e.g. 85.3240"
-                  {...register("longitude", {
-                    required: "Longitude is required",
-                    valueAsNumber: true,
-                  })}
-                />
-                {errors.longitude && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.longitude.message}
-                  </p>
-                )}
+                <div>
+                  <label htmlFor="mapLabel" className="text-sm font-semibold text-neutral-700">Map label (area name)</label>
+                  <input
+                    type="text"
+                    className="input-field mt-1.5"
+                    placeholder="e.g. Jawalakhel, Lalitpur"
+                    onChange={(e) => setValue("mapLabel", e.target.value, { shouldValidate: true })}
+                    defaultValue={mapLabel || ""}
+                  />
+                </div>
               </div>
             </div>
-            {latitude && longitude ? (
-              <div className="border rounded-sm overflow-hidden">
-                <div className="px-4 py-3 border-b bg-gray-50 text-sm text-gray-700">
-                  Map preview for {mapLabel || "selected location"}
-                </div>
-                <iframe
-                  title="Property Location Preview"
-                  src={`https://www.google.com/maps?q=${latitude},${longitude}&z=15&output=embed`}
-                  className="w-full h-72 border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
-            ) : null}
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xl">Tags</h3>
+            <p className="text-sm text-neutral-500 -mt-1">
+              Help tenants find your listing faster. Add up to 12 tags
+              (e.g. pet-friendly, near transit, furnished).
+            </p>
+            <TagInput value={tags} onChange={setTags} />
           </div>
 
           <div className="space-y-6">

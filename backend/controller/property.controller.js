@@ -13,7 +13,8 @@ const parser = new DatauriParser();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-const validStatuses = ["Active", "Inactive", "Pending", "Rented"];
+const validStatuses = ["For Rent", "For Sale", "Sold", "Pending", "Off Market"];
+const publicVisibleStatuses = ["For Rent", "For Sale", "Pending"];
 const validVisitStatuses = ["Pending", "Approved", "Rejected", "Completed"];
 
 const getTrustLabel = (score) => {
@@ -128,6 +129,7 @@ const buildLocation = (body) => {
     body.mapLabel ||
     body.location?.mapLabel ||
     [body.address, body.city].filter(Boolean).join(", ");
+  const landmark = (body.landmark ?? body.location?.landmark ?? "").toString().trim();
 
   if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
     throw new Error("Valid latitude and longitude are required");
@@ -137,8 +139,23 @@ const buildLocation = (body) => {
     latitude,
     longitude,
     mapLabel,
+    landmark,
     googleMapsUrl: `https://www.google.com/maps?q=${latitude},${longitude}`,
   };
+};
+
+const normalizeTags = (tags) => {
+  if (!tags) return [];
+  if (Array.isArray(tags)) return tags.map((t) => String(t).trim()).filter(Boolean).slice(0, 12);
+  if (typeof tags === "string") {
+    // tags may arrive as a JSON string or as comma-separated values from a form
+    try {
+      const parsed = JSON.parse(tags);
+      if (Array.isArray(parsed)) return parsed.map((t) => String(t).trim()).filter(Boolean).slice(0, 12);
+    } catch (e) { /* fallthrough */ }
+    return tags.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 12);
+  }
+  return [];
 };
 
 const createProperty = async (req, res) => {
@@ -166,6 +183,7 @@ const createProperty = async (req, res) => {
 
     const newProperty = new propertyModel({
       ...formData,
+      tags: normalizeTags(formData.tags),
       imgUrls,
       location: buildLocation(formData),
       userId: req.params.id,
@@ -229,7 +247,7 @@ const getAllProperties = async (req, res) => {
     const query = {};
 
     if (status) {
-      if (status !== "Active" && !isAdmin) {
+      if (!publicVisibleStatuses.includes(status) && !isAdmin) {
         return res
           .status(403)
           .json({ success: false, message: "Admin access required" });
@@ -246,7 +264,7 @@ const getAllProperties = async (req, res) => {
         .status(403)
         .json({ success: false, message: "Admin access required" });
     } else if (includeInactive !== "true") {
-      query.status = "Active";
+      query.status = { $in: publicVisibleStatuses };
     }
 
     const properties = await propertyModel
@@ -354,7 +372,7 @@ const updateProperty = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "Invalid property status. Must be one of: Active, Inactive, Pending, Rented",
+          "Invalid property status. Must be one of: For Rent, For Sale, Sold, Pending, Off Market",
       });
     }
 
@@ -362,12 +380,18 @@ const updateProperty = async (req, res) => {
       updates.latitude !== undefined ||
       updates.longitude !== undefined ||
       updates.mapLabel !== undefined ||
+      updates.landmark !== undefined ||
       updates.location
     ) {
       updates.location = buildLocation(updates);
       delete updates.latitude;
       delete updates.longitude;
       delete updates.mapLabel;
+      delete updates.landmark;
+    }
+
+    if (updates.tags !== undefined) {
+      updates.tags = normalizeTags(updates.tags);
     }
 
     if (updates.price !== undefined) {
@@ -383,12 +407,30 @@ const updateProperty = async (req, res) => {
       }
     }
 
+    const protectedFields = new Set([
+      "_id",
+      "userId",
+      "createdAt",
+      "updatedAt",
+      "reviews",
+      "visitSchedules",
+      "priceHistory",
+      "trustScore",
+      "imgUrls",
+      "complaintsCount",
+      "__v",
+      "$push",
+      "priceChangeReason",
+    ]);
+
+    const sanitizedSet = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => !protectedFields.has(key))
+    );
+
     const updatedProperty = await propertyModel.findByIdAndUpdate(
       req.params.id,
       {
-        $set: Object.fromEntries(
-          Object.entries(updates).filter(([key]) => key !== "$push" && key !== "priceChangeReason")
-        ),
+        $set: sanitizedSet,
         ...(updates.$push ? { $push: updates.$push } : {}),
       },
       { new: true, runValidators: true }
@@ -402,6 +444,10 @@ const updateProperty = async (req, res) => {
     }
 
     await attachDerivedPropertyState(updatedProperty);
+    await updatedProperty.populate(
+      "userId",
+      "fullname email phoneNumber profileImage isVerified"
+    );
 
     res.status(200).json({
       success: true,
@@ -450,6 +496,10 @@ const updatePropertyStatus = async (req, res) => {
 
     property.status = status;
     await property.save();
+    await property.populate(
+      "userId",
+      "fullname email phoneNumber profileImage isVerified"
+    );
 
     res
       .status(200)
@@ -638,6 +688,133 @@ const updateVisitScheduleStatus = async (req, res) => {
   }
 };
 
+
+const isImageOwnerOrAdmin = (property, user) =>
+  property.userId.toString() === user._id.toString() || hasRole(user, "admin");
+
+const addPropertyImages = async (req, res) => {
+  try {
+    const property = await propertyModel.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: "Property not found" });
+    }
+
+    if (!isImageOwnerOrAdmin(property, req.user)) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No images uploaded" });
+    }
+
+    const newUrls = await uploadImages(req.files);
+    property.imgUrls = [...property.imgUrls, ...newUrls];
+    await property.save();
+
+    await property.populate(
+      "userId",
+      "fullname email phoneNumber profileImage isVerified"
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Images added",
+      imgUrls: property.imgUrls,
+      property,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to add images" });
+  }
+};
+
+const replacePropertyImage = async (req, res) => {
+  try {
+    const { imageIndex } = req.body;
+    const idx = Number(imageIndex);
+
+    const property = await propertyModel.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: "Property not found" });
+    }
+
+    if (!isImageOwnerOrAdmin(property, req.user)) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    if (Number.isNaN(idx) || idx < 0 || idx >= property.imgUrls.length) {
+      return res.status(400).json({ success: false, message: "Invalid image index" });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No replacement image uploaded" });
+    }
+
+    const [newUrl] = await uploadImages([req.files[0]]);
+    property.imgUrls[idx] = newUrl;
+    property.markModified("imgUrls");
+    await property.save();
+
+    await property.populate(
+      "userId",
+      "fullname email phoneNumber profileImage isVerified"
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Image replaced",
+      imgUrls: property.imgUrls,
+      property,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to replace image" });
+  }
+};
+
+const deletePropertyImage = async (req, res) => {
+  try {
+    const { imageIndex } = req.params;
+    const idx = Number(imageIndex);
+
+    const property = await propertyModel.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: "Property not found" });
+    }
+
+    if (!isImageOwnerOrAdmin(property, req.user)) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    if (Number.isNaN(idx) || idx < 0 || idx >= property.imgUrls.length) {
+      return res.status(400).json({ success: false, message: "Invalid image index" });
+    }
+
+    if (property.imgUrls.length <= 5) {
+      return res.status(400).json({
+        success: false,
+        message: "At least 5 images are required. Add more images before deleting.",
+      });
+    }
+
+    property.imgUrls.splice(idx, 1);
+    property.markModified("imgUrls");
+    await property.save();
+
+    await property.populate(
+      "userId",
+      "fullname email phoneNumber profileImage isVerified"
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Image deleted",
+      imgUrls: property.imgUrls,
+      property,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to delete image" });
+  }
+};
+
 module.exports = {
   upload,
   createProperty,
@@ -650,4 +827,7 @@ module.exports = {
   addPropertyReview,
   scheduleVisit,
   updateVisitScheduleStatus,
+  addPropertyImages,
+  replacePropertyImage,
+  deletePropertyImage,
 };

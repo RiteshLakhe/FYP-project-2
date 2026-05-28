@@ -42,7 +42,7 @@ const fallbackProperty = {
   price: 28000,
   priceInWords: "Twenty Eight Thousand Rupees",
   negotiable: "Yes",
-  status: "Active",
+  status: "For Rent",
 };
 
 const seededCoordinates = [

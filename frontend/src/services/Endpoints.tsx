@@ -34,7 +34,10 @@ interface PropertyEndpoints {
   UPDATE_VISIT_STATUS: (id: string, visitId: string) => string;
   UPDATE: (id: string) => string;
   DELETE: (id: string) => string;
-  UPDATE_STATUS: (id: string) => string,
+  UPDATE_STATUS: (id: string) => string;
+  ADD_IMAGES: (id: string) => string;
+  REPLACE_IMAGE: (id: string) => string;
+  DELETE_IMAGE: (id: string, imageIndex: number) => string;
 }
 
 export const API_ENDPOINTS: {
@@ -78,6 +81,9 @@ export const API_ENDPOINTS: {
     UPDATE_VISIT_STATUS: (id, visitId) => `/property/${id}/visits/${visitId}`,
     UPDATE: (id) => `/property/updateProperty/${id}`,
     DELETE: (id) => `/property/deleteProperty/${id}`,
-    UPDATE_STATUS: (id) => `/property/updateStatus/${id}`, 
-  }
+    UPDATE_STATUS: (id) => `/property/updateStatus/${id}`,
+    ADD_IMAGES: (id) => `/property/${id}/images`,
+    REPLACE_IMAGE: (id) => `/property/${id}/images`,
+    DELETE_IMAGE: (id, imageIndex) => `/property/${id}/images/${imageIndex}`,
+  },
 };

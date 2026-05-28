@@ -19,6 +19,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import PropertyDummyImage from "../assets/property-dummy-image.jpeg";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { resolveAvatar } from "@/lib/avatar";
+import StatusBadge from "@/components/StatusBadge";
 
 interface User {
   id?: string;
@@ -34,6 +35,7 @@ interface PropertyLocation {
   longitude: number;
   mapLabel: string;
   googleMapsUrl: string;
+  landmark?: string;
 }
 
 interface PropertyReview {
@@ -114,6 +116,8 @@ interface Property {
   priceHistory: PriceHistoryEntry[];
   trustScore: TrustScore;
   createdAt: string;
+  status?: string;
+  tags?: string[];
 }
 
 interface EnquiryForm {
@@ -548,11 +552,31 @@ const PropertyDetails = () => {
             <div className="space-y-6 grid col-span-3">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
-                  <h1 className="text-2xl font-semibold">{property.title}</h1>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <StatusBadge status={property.status || "For Rent"} />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      {property.category} • {property.propertyType}
+                    </span>
+                  </div>
+                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">{property.title}</h1>
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <FaLocationDot />
                     <span>{property.location?.mapLabel || property.address}</span>
                   </div>
+                  {property.location?.landmark && (
+                    <p className="text-xs text-neutral-500 italic">
+                      Landmark: {property.location.landmark}
+                    </p>
+                  )}
+                  {property.tags && property.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {property.tags.map((t) => (
+                        <span key={t} className="inline-flex items-center rounded-full bg-neutral-900 text-cyan-400 px-2.5 py-0.5 text-[11px] font-semibold">
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <p className=" font-semibold ">
                     <span className="text-lg text-[#205D3B]">
                       Total Price:{" "}

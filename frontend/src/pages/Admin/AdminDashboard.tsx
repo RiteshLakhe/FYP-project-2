@@ -13,6 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import StatusBadge from "@/components/StatusBadge";
+import PropertyImageManager from "@/components/PropertyImageManager";
+import { PROPERTY_STATUSES, type PropertyStatus } from "@/lib/propertyStatus";
+import { FiUsers, FiHome, FiRefreshCcw, FiSearch, FiSave, FiTrash2 } from "react-icons/fi";
+import LocationMapPicker from "@/components/LocationMapPicker";
+import TagInput from "@/components/TagInput";
 
 interface UserSummary {
   _id: string;
@@ -41,14 +47,66 @@ interface PropertySummary {
   propertyType?: string;
   price: number;
   priceInWords?: string;
-  status?: string;
+  status?: PropertyStatus;
+  imgUrls?: string[];
   userId: string | PropertyOwner;
+  totalArea?: number;
+  dimension?: number;
+  floor?: string;
+  roadType?: string;
+  propertyFace?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  kitchens?: number;
+  halls?: number;
+  furnishing?: string;
+  balcony?: number;
+  parkingSpace?: string;
+  negotiable?: string;
+  tags?: string[];
+  location?: {
+    latitude: number;
+    longitude: number;
+    mapLabel: string;
+    landmark?: string;
+  };
 }
 
-const fieldClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#38B593] focus:ring-2 focus:ring-[#38B593]/20";
-const quietButton =
-  "rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:border-gray-500";
+interface PropertyEditForm {
+  title: string;
+  description: string;
+  address: string;
+  city: string;
+  municipality: string;
+  wardNo: string;
+  category: string;
+  propertyType: string;
+  price: string;
+  priceInWords: string;
+  status: PropertyStatus;
+  totalArea: string;
+  dimension: string;
+  floor: string;
+  roadType: string;
+  propertyFace: string;
+  bedrooms: string;
+  bathrooms: string;
+  kitchens: string;
+  halls: string;
+  furnishing: string;
+  balcony: string;
+  parkingSpace: string;
+  negotiable: string;
+  tags: string[];
+  latitude: number;
+  longitude: number;
+  mapLabel: string;
+  landmark: string;
+}
+
+const inputClass =
+  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20";
+const labelClass = "text-xs font-bold uppercase tracking-wider text-slate-600";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -60,6 +118,11 @@ const AdminDashboard = () => {
   const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<PropertySummary | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [userQuery, setUserQuery] = useState("");
+  const [propertyQuery, setPropertyQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+
   const [userForm, setUserForm] = useState({
     fullname: "",
     email: "",
@@ -67,7 +130,7 @@ const AdminDashboard = () => {
     roles: "",
     currentRole: "tenant",
   });
-  const [propertyForm, setPropertyForm] = useState({
+  const [propertyForm, setPropertyForm] = useState<PropertyEditForm>({
     title: "",
     description: "",
     address: "",
@@ -78,7 +141,25 @@ const AdminDashboard = () => {
     propertyType: "Residential",
     price: "",
     priceInWords: "",
-    status: "Active",
+    status: "For Rent",
+    totalArea: "",
+    dimension: "",
+    floor: "",
+    roadType: "Paved",
+    propertyFace: "East",
+    bedrooms: "",
+    bathrooms: "",
+    kitchens: "",
+    halls: "",
+    furnishing: "",
+    balcony: "",
+    parkingSpace: "",
+    negotiable: "No",
+    tags: [],
+    latitude: 27.7172,
+    longitude: 85.324,
+    mapLabel: "",
+    landmark: "",
   });
 
   const loadAdminData = useCallback(async () => {
@@ -139,13 +220,41 @@ const AdminDashboard = () => {
       propertyType: property.propertyType || "Residential",
       price: String(property.price || ""),
       priceInWords: property.priceInWords || "",
-      status: property.status || "Active",
+      status: (property.status as PropertyStatus) || "For Rent",
+      totalArea: String(property.totalArea ?? ""),
+      dimension: String(property.dimension ?? ""),
+      floor: property.floor || "",
+      roadType: property.roadType || "Paved",
+      propertyFace: property.propertyFace || "East",
+      bedrooms: String(property.bedrooms ?? ""),
+      bathrooms: String(property.bathrooms ?? ""),
+      kitchens: String(property.kitchens ?? ""),
+      halls: String(property.halls ?? ""),
+      furnishing: property.furnishing || "",
+      balcony: String(property.balcony ?? ""),
+      parkingSpace: property.parkingSpace || "",
+      negotiable: property.negotiable || "No",
+      tags: property.tags || [],
+      latitude: property.location?.latitude || 27.7172,
+      longitude: property.location?.longitude || 85.324,
+      mapLabel: property.location?.mapLabel || "",
+      landmark: property.location?.landmark || "",
     });
+  };
+
+  const updatePropertyImages = (imgUrls: string[]) => {
+    if (!selectedProperty) return;
+    const updated = { ...selectedProperty, imgUrls };
+    setSelectedProperty(updated);
+    setProperties((prev) =>
+      prev.map((p) => (p._id === selectedProperty._id ? updated : p))
+    );
+    // Pull fresh data so all actors see the new image set
+    loadAdminData();
   };
 
   const saveUser = async () => {
     if (!selectedUser) return;
-
     const roles = userForm.roles
       .split(",")
       .map((role) => role.trim())
@@ -171,6 +280,7 @@ const AdminDashboard = () => {
       );
       setSelectedUser(null);
       toast.success("User updated.");
+      loadAdminData();
     } catch (error) {
       const err = error as AxiosError<{ message: string }>;
       toast.error(err.response?.data?.message || "Failed to update user.");
@@ -202,12 +312,20 @@ const AdminDashboard = () => {
 
     try {
       setSaving(true);
+      const payload = {
+        ...propertyForm,
+        price: Number(propertyForm.price),
+        totalArea: propertyForm.totalArea ? Number(propertyForm.totalArea) : undefined,
+        dimension: propertyForm.dimension ? Number(propertyForm.dimension) : undefined,
+        bedrooms: propertyForm.bedrooms ? Number(propertyForm.bedrooms) : undefined,
+        bathrooms: propertyForm.bathrooms ? Number(propertyForm.bathrooms) : undefined,
+        kitchens: propertyForm.kitchens ? Number(propertyForm.kitchens) : undefined,
+        halls: propertyForm.halls ? Number(propertyForm.halls) : undefined,
+        balcony: propertyForm.balcony ? Number(propertyForm.balcony) : undefined,
+      };
       const response = await Axios.put(
         API_ENDPOINTS.PROPERTY.UPDATE(selectedProperty._id),
-        {
-          ...propertyForm,
-          price: Number(propertyForm.price),
-        }
+        payload
       );
 
       setProperties((prev) =>
@@ -217,6 +335,8 @@ const AdminDashboard = () => {
       );
       setSelectedProperty(null);
       toast.success("Property updated.");
+      // Re-fetch authoritative list so changes are visible to every actor on next load
+      loadAdminData();
     } catch (error) {
       const err = error as AxiosError<{ message: string }>;
       toast.error(err.response?.data?.message || "Failed to update property.");
@@ -239,260 +359,435 @@ const AdminDashboard = () => {
   };
 
   const ownerName = (property: PropertySummary) => {
-    if (!property.userId) {
-      return "Deleted owner";
-    }
-
-    if (typeof property.userId === "object") {
-      return property.userId.fullname || "Deleted owner";
-    }
-
+    if (!property.userId) return "Deleted owner";
+    if (typeof property.userId === "object") return property.userId.fullname || "Deleted owner";
     return "Unknown";
   };
+
+  const filteredUsers = users.filter((u) =>
+    u.fullname.toLowerCase().includes(userQuery.toLowerCase()) ||
+    u.email.toLowerCase().includes(userQuery.toLowerCase())
+  );
+  const filteredProperties = properties.filter((p) => {
+    const q = propertyQuery.toLowerCase();
+    const matchesQuery =
+      !q ||
+      p.title.toLowerCase().includes(q) ||
+      p.address.toLowerCase().includes(q) ||
+      ownerName(p).toLowerCase().includes(q);
+    const matchesStatus = statusFilter === "All" || (p.status || "For Rent") === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
 
   if (!user || user.currentRole !== "admin") return null;
 
   return (
-    <div className="min-h-screen px-4 py-10">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <div className="rounded-lg bg-white p-8 shadow-lg">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="mt-2 text-gray-600">
-            Review accounts and listings, then edit or remove records directly.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <p className="text-sm text-gray-500">Total users</p>
-            <p className="mt-2 text-3xl font-semibold">{users.length}</p>
-          </div>
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <p className="text-sm text-gray-500">Total properties</p>
-            <p className="mt-2 text-3xl font-semibold">{properties.length}</p>
-          </div>
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <p className="text-sm text-gray-500">Data</p>
-            <button
-              type="button"
-              className="mt-3 rounded-md bg-[#38B593] px-4 py-2 text-sm font-medium text-white hover:bg-[#2e9a7d]"
-              onClick={loadAdminData}
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        <section className="rounded-lg bg-white p-6 shadow-lg">
-          <h2 className="text-2xl font-semibold">Users</h2>
-          {loading ? (
-            <p className="mt-4">Loading users...</p>
-          ) : error ? (
-            <p className="mt-4 text-red-500">{error}</p>
-          ) : (
-            <div className="mt-5 overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Roles</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Current role</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {users.map((userItem) => (
-                    <tr key={userItem._id}>
-                      <td className="px-4 py-3 text-sm text-gray-700">{userItem.fullname}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{userItem.email}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{userItem.roles.join(", ")}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{userItem.currentRole}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
-                          <button className={quietButton} onClick={() => openUser(userItem)}>
-                            View/Edit
-                          </button>
-                          <button
-                            className="rounded-md bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
-                            onClick={() => deleteUser(userItem)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-lg bg-white p-6 shadow-lg">
-          <h2 className="text-2xl font-semibold">Properties</h2>
-          {loading ? (
-            <p className="mt-4">Loading properties...</p>
-          ) : error ? (
-            <p className="mt-4 text-red-500">{error}</p>
-          ) : (
-            <div className="mt-5 overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Title</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Owner</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Address</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Price</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {properties.map((property) => (
-                    <tr key={property._id}>
-                      <td className="px-4 py-3 text-sm text-gray-700">{property.title}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{ownerName(property)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{property.address}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{property.status || "Active"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">NRS. {property.price}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
-                          <button className={quietButton} onClick={() => navigate(`/property/${property._id}`)}>
-                            View
-                          </button>
-                          <button className={quietButton} onClick={() => openProperty(property)}>
-                            Edit
-                          </button>
-                          <button
-                            className="rounded-md bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
-                            onClick={() => deleteProperty(property)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+    <div className="page-reveal mx-auto max-w-[1440px] px-4 lg:px-8 py-10 space-y-8">
+      <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-8 md:p-10 text-white">
+        <p className="eyebrow text-blue-200">Admin console</p>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mt-1">
+          Manage users, listings, and statuses.
+        </h1>
+        <p className="text-blue-100/80 mt-2 max-w-2xl">
+          Edit any property field including images, prices, location and status.
+          Remove accounts or listings as needed.
+        </p>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard label="Total users" value={users.length} icon={<FiUsers />} tone="blue" />
+        <StatCard label="Total properties" value={properties.length} icon={<FiHome />} tone="emerald" />
+        <StatCard
+          label="Refresh data"
+          icon={<FiRefreshCcw />}
+          tone="amber"
+          action={
+            <button onClick={loadAdminData} className="btn-primary !py-2 !px-4 mt-2">
+              Refresh now
+            </button>
+          }
+        />
+      </div>
+
+      {/* Users */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+          <h2 className="text-xl font-bold text-slate-900">Users</h2>
+          <div className="relative w-full md:w-80">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm outline-none focus:border-blue-600"
+              placeholder="Search users..."
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-slate-500">Loading users...</p>
+        ) : error ? (
+          <p className="text-red-600">{error}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-slate-50 rounded-lg">
+                <tr>
+                  {["Name", "Email", "Roles", "Current role", ""].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredUsers.map((u) => (
+                  <tr key={u._id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-800">{u.fullname}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{u.email}</td>
+                    <td className="px-4 py-3 text-xs text-slate-600">{u.roles.join(", ")}</td>
+                    <td className="px-4 py-3"><span className="inline-flex rounded-full bg-blue-50 text-blue-700 px-2.5 py-0.5 text-xs font-bold uppercase">{u.currentRole}</span></td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex gap-2">
+                        <button className="btn-secondary !py-1.5 !px-3 !text-xs" onClick={() => openUser(u)}>Edit</button>
+                        <button className="btn-danger !py-1.5 !px-3 !text-xs" onClick={() => deleteUser(u)}>
+                          <FiTrash2 size={12} /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Properties */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+          <h2 className="text-xl font-bold text-slate-900">Properties</h2>
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              <option value="All">All statuses</option>
+              {PROPERTY_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <div className="relative w-full md:w-80">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm outline-none focus:border-blue-600"
+                placeholder="Search by title, address, owner..."
+                value={propertyQuery}
+                onChange={(e) => setPropertyQuery(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-slate-500">Loading properties...</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-slate-50">
+                <tr>
+                  {["Property", "Owner", "Address", "Status", "Price", ""].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredProperties.map((property) => (
+                  <tr key={property._id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex items-center gap-3">
+                        {property.imgUrls?.[0] && (
+                          <img
+                            src={property.imgUrls[0]}
+                            alt=""
+                            className="h-12 w-16 rounded-md object-cover"
+                          />
+                        )}
+                        <span className="font-semibold text-slate-800 line-clamp-1">{property.title}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{ownerName(property)}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600 line-clamp-1 max-w-[260px]">{property.address}</td>
+                    <td className="px-4 py-3"><StatusBadge status={property.status || "For Rent"} /></td>
+                    <td className="px-4 py-3 text-sm font-bold text-slate-800">Rs. {property.price?.toLocaleString("en-IN")}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex gap-2">
+                        <button className="btn-secondary !py-1.5 !px-3 !text-xs" onClick={() => navigate(`/property/${property._id}`)}>View</button>
+                        <button className="btn-secondary !py-1.5 !px-3 !text-xs" onClick={() => openProperty(property)}>Edit</button>
+                        <button className="btn-danger !py-1.5 !px-3 !text-xs" onClick={() => deleteProperty(property)}>
+                          <FiTrash2 size={12} /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredProperties.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-slate-500">No properties match these filters.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* User edit dialog */}
       <Dialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>View/Edit User</DialogTitle>
+            <DialogTitle>Edit user</DialogTitle>
             <DialogDescription>Roles should be comma-separated.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>Full name</span>
-              <input className={fieldClass} value={userForm.fullname} onChange={(event) => setUserForm((prev) => ({ ...prev, fullname: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Email</span>
-              <input className={fieldClass} type="email" value={userForm.email} onChange={(event) => setUserForm((prev) => ({ ...prev, email: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Phone</span>
-              <input className={fieldClass} value={userForm.phoneNumber} onChange={(event) => setUserForm((prev) => ({ ...prev, phoneNumber: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Current role</span>
-              <select className={fieldClass} value={userForm.currentRole} onChange={(event) => setUserForm((prev) => ({ ...prev, currentRole: event.target.value }))}>
+            <Field label="Full name">
+              <input className={inputClass} value={userForm.fullname} onChange={(e) => setUserForm((p) => ({ ...p, fullname: e.target.value }))} />
+            </Field>
+            <Field label="Email">
+              <input className={inputClass} type="email" value={userForm.email} onChange={(e) => setUserForm((p) => ({ ...p, email: e.target.value }))} />
+            </Field>
+            <Field label="Phone">
+              <input className={inputClass} value={userForm.phoneNumber} onChange={(e) => setUserForm((p) => ({ ...p, phoneNumber: e.target.value }))} />
+            </Field>
+            <Field label="Current role">
+              <select className={inputClass} value={userForm.currentRole} onChange={(e) => setUserForm((p) => ({ ...p, currentRole: e.target.value }))}>
                 <option value="tenant">tenant</option>
                 <option value="landlord">landlord</option>
               </select>
-            </label>
-            <label className="space-y-1 text-sm sm:col-span-2">
-              <span>Roles</span>
-              <input className={fieldClass} value={userForm.roles} onChange={(event) => setUserForm((prev) => ({ ...prev, roles: event.target.value }))} />
-            </label>
+            </Field>
+            <Field label="Roles (comma separated)" className="sm:col-span-2">
+              <input className={inputClass} value={userForm.roles} onChange={(e) => setUserForm((p) => ({ ...p, roles: e.target.value }))} />
+            </Field>
           </div>
           <DialogFooter>
-            <button className={quietButton} onClick={() => setSelectedUser(null)}>Cancel</button>
-            <button className="rounded-md bg-[#38B593] px-4 py-2 text-sm font-medium text-white hover:bg-[#2e9a7d] disabled:opacity-60" disabled={saving} onClick={saveUser}>
-              {saving ? "Saving..." : "Save user"}
+            <button className="btn-secondary" onClick={() => setSelectedUser(null)}>Cancel</button>
+            <button className="btn-primary" disabled={saving} onClick={saveUser}>
+              <FiSave /> {saving ? "Saving..." : "Save user"}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Property edit dialog */}
       <Dialog open={!!selectedProperty} onOpenChange={(open) => !open && setSelectedProperty(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>View/Edit Property</DialogTitle>
-            <DialogDescription>Update listing details, price, and status.</DialogDescription>
+            <DialogTitle className="flex items-center gap-3">
+              Edit property
+              <StatusBadge status={propertyForm.status} />
+            </DialogTitle>
+            <DialogDescription>Update every field including images, price, and status.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="space-y-1 text-sm sm:col-span-2">
-              <span>Title</span>
-              <input className={fieldClass} value={propertyForm.title} onChange={(event) => setPropertyForm((prev) => ({ ...prev, title: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm sm:col-span-2">
-              <span>Description</span>
-              <textarea className={`${fieldClass} min-h-24`} value={propertyForm.description} onChange={(event) => setPropertyForm((prev) => ({ ...prev, description: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm sm:col-span-2">
-              <span>Address</span>
-              <input className={fieldClass} value={propertyForm.address} onChange={(event) => setPropertyForm((prev) => ({ ...prev, address: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>City</span>
-              <input className={fieldClass} value={propertyForm.city} onChange={(event) => setPropertyForm((prev) => ({ ...prev, city: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Municipality</span>
-              <input className={fieldClass} value={propertyForm.municipality} onChange={(event) => setPropertyForm((prev) => ({ ...prev, municipality: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Ward no.</span>
-              <input className={fieldClass} value={propertyForm.wardNo} onChange={(event) => setPropertyForm((prev) => ({ ...prev, wardNo: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Status</span>
-              <select className={fieldClass} value={propertyForm.status} onChange={(event) => setPropertyForm((prev) => ({ ...prev, status: event.target.value }))}>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Pending">Pending</option>
-                <option value="Rented">Rented</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Category</span>
-              <select className={fieldClass} value={propertyForm.category} onChange={(event) => setPropertyForm((prev) => ({ ...prev, category: event.target.value }))}>
-                <option value="Room">Room</option>
-                <option value="Appartment">Appartment</option>
-                <option value="Commercial Space">Commercial Space</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Property type</span>
-              <select className={fieldClass} value={propertyForm.propertyType} onChange={(event) => setPropertyForm((prev) => ({ ...prev, propertyType: event.target.value }))}>
-                <option value="Residential">Residential</option>
-                <option value="Commercial">Commercial</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Price</span>
-              <input className={fieldClass} type="number" value={propertyForm.price} onChange={(event) => setPropertyForm((prev) => ({ ...prev, price: event.target.value }))} />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Price in words</span>
-              <input className={fieldClass} value={propertyForm.priceInWords} onChange={(event) => setPropertyForm((prev) => ({ ...prev, priceInWords: event.target.value }))} />
-            </label>
-          </div>
+
+          {selectedProperty && (
+            <div className="space-y-8">
+              {/* Image management */}
+              <section className="rounded-xl border border-slate-200 p-5">
+                <PropertyImageManager
+                  propertyId={selectedProperty._id}
+                  images={selectedProperty.imgUrls || []}
+                  onChange={updatePropertyImages}
+                />
+              </section>
+
+              {/* Status & pricing */}
+              <section className="space-y-3">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Status & Pricing</h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="Status">
+                    <select className={inputClass} value={propertyForm.status} onChange={(e) => setPropertyForm((p) => ({ ...p, status: e.target.value as PropertyStatus }))}>
+                      {PROPERTY_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Price">
+                    <input className={inputClass} type="number" value={propertyForm.price} onChange={(e) => setPropertyForm((p) => ({ ...p, price: e.target.value }))} />
+                  </Field>
+                  <Field label="Price in words">
+                    <input className={inputClass} value={propertyForm.priceInWords} onChange={(e) => setPropertyForm((p) => ({ ...p, priceInWords: e.target.value }))} />
+                  </Field>
+                  <Field label="Negotiable">
+                    <select className={inputClass} value={propertyForm.negotiable} onChange={(e) => setPropertyForm((p) => ({ ...p, negotiable: e.target.value }))}>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </Field>
+                </div>
+              </section>
+
+              {/* Basics */}
+              <section className="space-y-3">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Basics</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Title" className="sm:col-span-2">
+                    <input className={inputClass} value={propertyForm.title} onChange={(e) => setPropertyForm((p) => ({ ...p, title: e.target.value }))} />
+                  </Field>
+                  <Field label="Description" className="sm:col-span-2">
+                    <textarea className={`${inputClass} min-h-24`} value={propertyForm.description} onChange={(e) => setPropertyForm((p) => ({ ...p, description: e.target.value }))} />
+                  </Field>
+                  <Field label="Category">
+                    <select className={inputClass} value={propertyForm.category} onChange={(e) => setPropertyForm((p) => ({ ...p, category: e.target.value }))}>
+                      <option value="Room">Room</option>
+                      <option value="Appartment">Appartment</option>
+                      <option value="Commercial Space">Commercial Space</option>
+                    </select>
+                  </Field>
+                  <Field label="Property type">
+                    <select className={inputClass} value={propertyForm.propertyType} onChange={(e) => setPropertyForm((p) => ({ ...p, propertyType: e.target.value }))}>
+                      <option value="Residential">Residential</option>
+                      <option value="Commercial">Commercial</option>
+                    </select>
+                  </Field>
+                </div>
+              </section>
+
+              {/* Location */}
+              <section className="space-y-3">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Location</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Address" className="sm:col-span-2">
+                    <input className={inputClass} value={propertyForm.address} onChange={(e) => setPropertyForm((p) => ({ ...p, address: e.target.value }))} />
+                  </Field>
+                  <Field label="City"><input className={inputClass} value={propertyForm.city} onChange={(e) => setPropertyForm((p) => ({ ...p, city: e.target.value }))} /></Field>
+                  <Field label="Municipality"><input className={inputClass} value={propertyForm.municipality} onChange={(e) => setPropertyForm((p) => ({ ...p, municipality: e.target.value }))} /></Field>
+                  <Field label="Ward no."><input className={inputClass} value={propertyForm.wardNo} onChange={(e) => setPropertyForm((p) => ({ ...p, wardNo: e.target.value }))} /></Field>
+                  <Field label="Road type">
+                    <select className={inputClass} value={propertyForm.roadType} onChange={(e) => setPropertyForm((p) => ({ ...p, roadType: e.target.value }))}>
+                      <option value="Paved">Paved</option>
+                      <option value="Gravelled">Gravelled</option>
+                      <option value="Alley">Alley</option>
+                    </select>
+                  </Field>
+                  <Field label="Property face">
+                    <select className={inputClass} value={propertyForm.propertyFace} onChange={(e) => setPropertyForm((p) => ({ ...p, propertyFace: e.target.value }))}>
+                      {["East","West","North","South","South-East","South-West","North-East","North-West"].map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </Field>
+                </div>
+              </section>
+
+              {/* Specs */}
+              <section className="space-y-3">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Specifications</h3>
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+                  <Field label="Total area"><input type="number" className={inputClass} value={propertyForm.totalArea} onChange={(e) => setPropertyForm((p) => ({ ...p, totalArea: e.target.value }))} /></Field>
+                  <Field label="Dimension"><input type="number" className={inputClass} value={propertyForm.dimension} onChange={(e) => setPropertyForm((p) => ({ ...p, dimension: e.target.value }))} /></Field>
+                  <Field label="Floor"><input className={inputClass} value={propertyForm.floor} onChange={(e) => setPropertyForm((p) => ({ ...p, floor: e.target.value }))} /></Field>
+                  <Field label="Furnishing">
+                    <select className={inputClass} value={propertyForm.furnishing} onChange={(e) => setPropertyForm((p) => ({ ...p, furnishing: e.target.value }))}>
+                      <option value="">—</option>
+                      <option value="Furnished">Furnished</option>
+                      <option value="Semi-Furnished">Semi-Furnished</option>
+                      <option value="Unfurnished">Unfurnished</option>
+                    </select>
+                  </Field>
+                  <Field label="Bedrooms"><input type="number" className={inputClass} value={propertyForm.bedrooms} onChange={(e) => setPropertyForm((p) => ({ ...p, bedrooms: e.target.value }))} /></Field>
+                  <Field label="Bathrooms"><input type="number" className={inputClass} value={propertyForm.bathrooms} onChange={(e) => setPropertyForm((p) => ({ ...p, bathrooms: e.target.value }))} /></Field>
+                  <Field label="Kitchens"><input type="number" className={inputClass} value={propertyForm.kitchens} onChange={(e) => setPropertyForm((p) => ({ ...p, kitchens: e.target.value }))} /></Field>
+                  <Field label="Halls"><input type="number" className={inputClass} value={propertyForm.halls} onChange={(e) => setPropertyForm((p) => ({ ...p, halls: e.target.value }))} /></Field>
+                  <Field label="Balcony"><input type="number" className={inputClass} value={propertyForm.balcony} onChange={(e) => setPropertyForm((p) => ({ ...p, balcony: e.target.value }))} /></Field>
+                  <Field label="Parking"><input className={inputClass} value={propertyForm.parkingSpace} onChange={(e) => setPropertyForm((p) => ({ ...p, parkingSpace: e.target.value }))} /></Field>
+                </div>
+              </section>
+
+              {/* Map + landmark */}
+              <section className="space-y-3">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Map location & landmark</h3>
+                <LocationMapPicker
+                  value={{ lat: propertyForm.latitude, lng: propertyForm.longitude }}
+                  onChange={({ lat, lng }) =>
+                    setPropertyForm((p) => ({ ...p, latitude: lat, longitude: lng }))
+                  }
+                  landmark={propertyForm.landmark}
+                  onLandmarkChange={(landmark) =>
+                    setPropertyForm((p) => ({ ...p, landmark }))
+                  }
+                />
+                <Field label="Map label (area)">
+                  <input
+                    className={inputClass}
+                    value={propertyForm.mapLabel}
+                    onChange={(e) => setPropertyForm((p) => ({ ...p, mapLabel: e.target.value }))}
+                  />
+                </Field>
+              </section>
+
+              {/* Tags */}
+              <section className="space-y-3">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Tags</h3>
+                <TagInput
+                  value={propertyForm.tags}
+                  onChange={(tags) => setPropertyForm((p) => ({ ...p, tags }))}
+                />
+              </section>
+            </div>
+          )}
+
           <DialogFooter>
-            <button className={quietButton} onClick={() => setSelectedProperty(null)}>Cancel</button>
-            <button className="rounded-md bg-[#38B593] px-4 py-2 text-sm font-medium text-white hover:bg-[#2e9a7d] disabled:opacity-60" disabled={saving} onClick={saveProperty}>
-              {saving ? "Saving..." : "Save property"}
+            <button className="btn-secondary" onClick={() => setSelectedProperty(null)}>Cancel</button>
+            <button className="btn-primary" disabled={saving} onClick={saveProperty}>
+              <FiSave /> {saving ? "Saving..." : "Save property"}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+};
+
+const Field = ({
+  label,
+  className = "",
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) => (
+  <label className={`flex flex-col gap-1.5 ${className}`}>
+    <span className={labelClass}>{label}</span>
+    {children}
+  </label>
+);
+
+const StatCard = ({
+  label,
+  value,
+  icon,
+  tone,
+  action,
+}: {
+  label: string;
+  value?: string | number;
+  icon: React.ReactNode;
+  tone: "blue" | "emerald" | "amber";
+  action?: React.ReactNode;
+}) => {
+  const accent =
+    tone === "blue"
+      ? "bg-blue-50 text-blue-600"
+      : tone === "emerald"
+      ? "bg-emerald-50 text-emerald-600"
+      : "bg-amber-50 text-amber-600";
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-wider font-bold text-slate-500">{label}</p>
+          {value !== undefined && <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>}
+          {action}
+        </div>
+        <div className={`grid h-12 w-12 place-items-center rounded-xl ${accent} text-xl`}>
+          {icon}
+        </div>
+      </div>
     </div>
   );
 };

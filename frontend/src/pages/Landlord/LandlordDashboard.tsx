@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,20 +19,25 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  CartesianGrid,
 } from "recharts";
 import { useUser } from "@/context/UserContext";
 import { Axios } from "@/services/AxiosInstance";
 import { API_ENDPOINTS } from "@/services/Endpoints";
-import { FiPlusCircle } from "react-icons/fi";
+import { FiPlusCircle, FiTrendingUp, FiHome, FiBriefcase } from "react-icons/fi";
 import { useNavigate } from "react-router";
 import PropertyStatusDropdown from "@/components/PropertyStatusDropdown";
+import type { PropertyStatus } from "@/lib/propertyStatus";
 
 interface Property {
   _id: string;
   title: string;
   category: "Room" | "Appartment" | "Commercial Space";
   price: number;
-  status: "Active" | "Inactive" | "Pending" | "Rented";
+  status: PropertyStatus;
+  imgUrls?: string[];
+  address?: string;
+  tags?: string[];
 }
 
 export default function LandlordDashboard() {
@@ -42,38 +47,38 @@ export default function LandlordDashboard() {
   const { user } = useUser();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchProperties = async () => {
-      if (!user) return;
-
-      try {
-        const res = await Axios.get(
-          API_ENDPOINTS.PROPERTY.GET_BY_OWNER(user.id)
-        );
-        setProperties(res.data.properties);
-      } catch (error) {
-        console.error("Failed to fetch properties:", error);
-        setError("Failed to load your listings.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProperties();
+  const fetchProperties = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const res = await Axios.get(API_ENDPOINTS.PROPERTY.GET_BY_OWNER(user.id));
+      setProperties(res.data.properties);
+    } catch (error) {
+      console.error("Failed to fetch properties:", error);
+      setError("Failed to load your listings.");
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    fetchProperties();
+  }, [fetchProperties]);
 
   const countByCategory = (category: Property["category"]) =>
     properties.filter((p) => p.category === category).length;
 
-  const chartData = ["Room", "Appartment", "Commercial Space"].map((cat) => {
-    const total = properties
+  const activeListings = properties.filter(
+    (p) => p.status === "For Rent" || p.status === "For Sale"
+  ).length;
+  const totalRevenue = properties.reduce((sum, p) => sum + p.price, 0);
+
+  const chartData = ["Room", "Appartment", "Commercial Space"].map((cat) => ({
+    category: cat === "Appartment" ? "Apartment" : cat,
+    totalRent: properties
       .filter((p) => p.category === cat)
-      .reduce((sum, p) => sum + p.price, 0);
-    return {
-      category: cat,
-      totalRent: total,
-    };
-  });
+      .reduce((sum, p) => sum + p.price, 0),
+  }));
 
   const maxRent = Math.max(...chartData.map((d) => d.totalRent), 0);
 
@@ -88,62 +93,88 @@ export default function LandlordDashboard() {
   };
 
   return (
-    <div className="px-4 md:px-10 xl:px-40 2xl:px-80 py-16 grow space-y-8">
-      <h1 className="text-3xl font-medium">
-        Welcome back, {user?.fullname?.split(" ")[0] || "Landlord"}!
-      </h1>
+    <div className="page-reveal mx-auto max-w-[1440px] px-4 lg:px-8 py-12 space-y-10">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <p className="eyebrow">Landlord Console</p>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 mt-1">
+            Welcome back, {user?.fullname?.split(" ")[0] || "Landlord"}!
+          </h1>
+          <p className="text-slate-600 mt-1">
+            Manage your listings, update statuses, and track demand.
+          </p>
+        </div>
+        <button
+          className="btn-primary"
+          onClick={() => navigate("/landlord/addPropertyForm")}>
+          <FiPlusCircle /> Post a new property
+        </button>
+      </div>
 
-      {error && <p className="text-red-500">{error}</p>}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {loading ? (
-        <p>Loading...</p>
+        <p className="text-slate-500">Loading...</p>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <InfoCard
-              title="Total Rooms Listed"
-              value={countByCategory("Room")}
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              icon={<FiHome />}
+              accent="bg-blue-50 text-blue-600"
+              label="Total listings"
+              value={properties.length}
             />
-            <InfoCard
-              title="Total Apartments Listed"
+            <StatCard
+              icon={<FiTrendingUp />}
+              accent="bg-emerald-50 text-emerald-600"
+              label="Active listings"
+              value={activeListings}
+            />
+            <StatCard
+              icon={<FiBriefcase />}
+              accent="bg-amber-50 text-amber-600"
+              label="Apartments"
               value={countByCategory("Appartment")}
             />
-            <InfoCard
-              title="Total Commercial Spaces Listed"
-              value={countByCategory("Commercial Space")}
+            <StatCard
+              icon={<FiHome />}
+              accent="bg-purple-50 text-purple-600"
+              label="Total monthly value"
+              value={`Rs. ${totalRevenue.toLocaleString("en-IN")}`}
             />
           </div>
 
-          {/* Bar Chart */}
+          {/* Chart */}
           <div>
-            <h2 className="text-xl font-semibold mb-2">
-              Total Rent by Property Category
+            <h2 className="text-lg font-bold text-slate-900 mb-3">
+              Rent value by property category
             </h2>
-            <Card>
-              <CardContent className="p-4">
-                <ResponsiveContainer width="100%" height={300}>
+            <Card className="rounded-2xl border-slate-200">
+              <CardContent className="p-6">
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={chartData}>
-                    <XAxis dataKey="category" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="category" tick={{ fontSize: 12, fill: "#475569" }} />
                     <YAxis
                       domain={[0, maxRent * 1.2]}
-                      tickFormatter={(val) => `Rs. ${val}`}
+                      tickFormatter={(v) => `Rs. ${v / 1000}K`}
+                      tick={{ fontSize: 12, fill: "#475569" }}
                     />
                     <Tooltip
-                      formatter={(value: number) => [
-                        `Rs. ${value}`,
-                        "Total Rent",
-                      ]}
+                      formatter={(value: number) => [`Rs. ${value.toLocaleString("en-IN")}`, "Total"]}
+                      contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0" }}
                     />
                     <Legend />
                     <Bar
                       dataKey="totalRent"
-                      name="Total Rent"
-                      fill="#4f46e5"
-                      radius={[6, 6, 0, 0]}
-                      label={{
-                        position: "top",
-                        formatter: (v: number) => `Rs. ${v}`,
-                      }}
+                      name="Total rent"
+                      fill="#2563eb"
+                      radius={[8, 8, 0, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -151,35 +182,49 @@ export default function LandlordDashboard() {
             </Card>
           </div>
 
-          {/* Listings Table */}
-          <div className="space-y-2">
-            <div className="w-full flex items-center justify-between">
-              <h2 className="text-xl font-semibold mb-2">My Listings</h2>
-              <button
-                className="hidden sm:flex items-center px-4 md:px-6 py-2 md:py-2 rounded-sm gap-2 cursor-pointer bg-[#1E293B] text-white"
-                onClick={() => navigate("/landlord/addPropertyForm")}>
-                <FiPlusCircle />
-                <span className="text-sm md:text-base">Post your property</span>
-              </button>
-            </div>
-
-            <Card>
-              <CardContent className="p-2">
+          {/* Listings table */}
+          <div className="space-y-3">
+            <h2 className="text-lg font-bold text-slate-900">My listings</h2>
+            <Card className="rounded-2xl border-slate-200 overflow-hidden">
+              <CardContent className="p-0">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Property</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Rent</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="font-bold uppercase text-[11px] tracking-wider text-slate-500">Property</TableHead>
+                      <TableHead className="font-bold uppercase text-[11px] tracking-wider text-slate-500">Status</TableHead>
+                      <TableHead className="font-bold uppercase text-[11px] tracking-wider text-slate-500">Category</TableHead>
+                      <TableHead className="font-bold uppercase text-[11px] tracking-wider text-slate-500">Price</TableHead>
+                      <TableHead className="text-right font-bold uppercase text-[11px] tracking-wider text-slate-500">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {properties.map((property) => (
-                      <TableRow key={property._id} className="cursor-pointer">
-                        <TableCell>{property.title}</TableCell>
-                        <TableCell>
+                    {properties.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-12 text-center text-slate-500">
+                          You haven't posted any properties yet.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      properties.map((property) => (
+                        <TableRow key={property._id} className="hover:bg-slate-50">
+                          <TableCell className="font-semibold text-slate-900">
+                            <div className="flex items-center gap-3">
+                              {property.imgUrls?.[0] && (
+                                <img
+                                  src={property.imgUrls[0]}
+                                  alt=""
+                                  className="h-12 w-16 rounded-lg object-cover"
+                                />
+                              )}
+                              <div>
+                                <p className="line-clamp-1">{property.title}</p>
+                                {property.address && (
+                                  <p className="text-xs font-normal text-slate-500 line-clamp-1">{property.address}</p>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             <PropertyStatusDropdown
                               propertyId={property._id}
                               currentStatus={property.status}
@@ -187,37 +232,41 @@ export default function LandlordDashboard() {
                                 setProperties((prev) =>
                                   prev.map((p) =>
                                     p._id === property._id
-                                      ? { ...p, status: newStatus as Property["status"] }
+                                      ? { ...p, status: newStatus as PropertyStatus }
                                       : p
                                   )
                                 );
+                                fetchProperties();
                               }}
                             />
-                        </TableCell>
-                        <TableCell>{property.category}</TableCell>
-                        <TableCell>Rs. {property.price}</TableCell>
-                        <TableCell className="space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => viewProperty(property._id)}>
-                            View
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => editProperty(property._id)}>
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDelete(property._id)}>
-                            Delete
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-700">{property.category}</TableCell>
+                          <TableCell className="font-semibold text-slate-900">Rs. {property.price.toLocaleString("en-IN")}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="inline-flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => (window.location.href = `/property/${property._id}`)}>
+                                View
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => (window.location.href = `/landlord/editPropertyForm/${property._id}`)}>
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDelete(property._id)}>
+                                Delete
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -227,21 +276,28 @@ export default function LandlordDashboard() {
       )}
     </div>
   );
-
-  function viewProperty(id: string) {
-    window.location.href = `/property/${id}`;
-  }
-
-  function editProperty(id: string) {
-    window.location.href = `/landlord/editPropertyForm/${id}`;
-  }
 }
 
-const InfoCard = ({ title, value }: { title: string; value: number }) => (
-  <Card>
-    <CardContent className="p-4">
-      <p className="text-muted-foreground">{title}</p>
-      <h2 className="text-2xl font-semibold">{value}</h2>
+const StatCard = ({
+  icon,
+  accent,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  accent: string;
+  label: string;
+  value: string | number;
+}) => (
+  <Card className="rounded-2xl border-slate-200">
+    <CardContent className="p-5 flex items-center gap-4">
+      <div className={`grid h-12 w-12 place-items-center rounded-xl ${accent} text-xl`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">{label}</p>
+        <p className="text-xl font-bold text-slate-900 mt-0.5">{value}</p>
+      </div>
     </CardContent>
   </Card>
 );

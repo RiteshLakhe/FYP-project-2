@@ -37,7 +37,7 @@
       "priceInWords": "Forty Five Thousand Rupees",
       "negotiable": "No",
       "userId": "663cfeadcbb5f025d0a4f4a1",
-      "status": "Active"
+      "status": "For Rent"
     },
     {
       "title": "2BHK Apartment in Suryabinayak",
@@ -117,7 +117,7 @@
       "priceInWords": "14000 Rupees",
       "negotiable": "Yes",
       "userId": "663cfeadcbb5f025d0a4f4a1",
-      "status": "Active"
+      "status": "For Rent"
     },
     {
       "title": "Sample Property 5",
@@ -157,7 +157,7 @@
       "priceInWords": "15000 Rupees",
       "negotiable": "Yes",
       "userId": "663cfeadcbb5f025d0a4f4a1",
-      "status": "Active"
+      "status": "For Rent"
     },
     {
       "title": "Sample Property 6",
@@ -197,7 +197,7 @@
       "priceInWords": "16000 Rupees",
       "negotiable": "Yes",
       "userId": "663cfeadcbb5f025d0a4f4a1",
-      "status": "Active"
+      "status": "For Rent"
     },
     {
       "title": "Sample Property 7",
@@ -237,7 +237,7 @@
       "priceInWords": "17000 Rupees",
       "negotiable": "Yes",
       "userId": "663cfeadcbb5f025d0a4f4a1",
-      "status": "Active"
+      "status": "For Rent"
     },
     {
       "title": "Sample Property 8",
@@ -277,7 +277,7 @@
       "priceInWords": "18000 Rupees",
       "negotiable": "Yes",
       "userId": "663cfeadcbb5f025d0a4f4a1",
-      "status": "Active"
+      "status": "For Rent"
     },
     {
       "title": "Sample Property 9",
@@ -317,7 +317,7 @@
       "priceInWords": "19000 Rupees",
       "negotiable": "Yes",
       "userId": "663cfeadcbb5f025d0a4f4a1",
-      "status": "Active"
+      "status": "For Rent"
     },
     {
       "title": "Sample Property 10",
@@ -357,6 +357,6 @@
       "priceInWords": "20000 Rupees",
       "negotiable": "Yes",
       "userId": "663cfeadcbb5f025d0a4f4a1",
-      "status": "Active"
+      "status": "For Rent"
     }
   ]

@@ -133,6 +133,16 @@ const propertySchema = new mongoose.Schema(
       longitude: { type: Number, required: true },
       mapLabel: { type: String, required: true },
       googleMapsUrl: { type: String, required: true },
+      landmark: { type: String, default: "" },
+    },
+
+    tags: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (val) => Array.isArray(val) && val.length <= 12,
+        message: "A property can have at most 12 tags.",
+      },
     },
 
     verifiedListing: {
@@ -187,8 +197,14 @@ const propertySchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["Active", "Inactive", "Pending", "Rented"],
-      default: "Active",
+      enum: ["For Rent", "For Sale", "Sold", "Pending", "Off Market"],
+      default: "For Rent",
+    },
+
+    listingIntent: {
+      type: String,
+      enum: ["Rent", "Sale"],
+      default: "Rent",
     },
   },
   { timestamps: true }

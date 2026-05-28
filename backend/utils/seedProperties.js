@@ -39,7 +39,7 @@ const dummyProperties = [{
   "priceInWords": "Forty Five Thousand Rupees",
   "negotiable": "No",
   "userId": "6814ac57f21295f6d19bad2a",
-  "status": "Active"
+  "status": "For Rent"
 }];
 
 const seedProperties = async () => {
